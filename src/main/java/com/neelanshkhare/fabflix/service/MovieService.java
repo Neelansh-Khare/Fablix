@@ -80,6 +80,10 @@ public class MovieService {
         return movies;
     }
 
+    public List<Movie> getMoviesWithoutPosters(int limit) {
+        return movieDAO.getMoviesWithoutPosters(limit);
+    }
+
     public int getTotalMoviesCount() {
         return movieDAO.countMovies();
     }
@@ -164,10 +168,9 @@ public class MovieService {
                     // Update movie with new poster URL
                     movie.setBannerUrl(posterResult.getPosterUrl());
 
-                    // Update backdrop/trailer if available and current is empty
-                    if (posterResult.getBackdropUrl() != null &&
-                            (movie.getTrailerUrl() == null || movie.getTrailerUrl().isEmpty())) {
-                        movie.setTrailerUrl(posterResult.getBackdropUrl());
+                    // Update trailer if available
+                    if (posterResult.getTrailerUrl() != null && !posterResult.getTrailerUrl().isEmpty()) {
+                        movie.setTrailerUrl(posterResult.getTrailerUrl());
                     }
 
                     // Save to database
@@ -180,6 +183,9 @@ public class MovieService {
                     }
                 } else {
                     LOGGER.info("No poster found for: " + movie.getTitle());
+                    // Mark as not found to prevent infinite retries
+                    movie.setBannerUrl("poster_not_found");
+                    movieDAO.update(movie);
                 }
 
             } catch (Exception e) {
@@ -209,8 +215,8 @@ public class MovieService {
             if (posterResult != null && posterResult.getPosterUrl() != null) {
                 movie.setBannerUrl(posterResult.getPosterUrl());
 
-                if (posterResult.getBackdropUrl() != null) {
-                    movie.setTrailerUrl(posterResult.getBackdropUrl());
+                if (posterResult.getTrailerUrl() != null) {
+                    movie.setTrailerUrl(posterResult.getTrailerUrl());
                 }
 
                 return movieDAO.update(movie);

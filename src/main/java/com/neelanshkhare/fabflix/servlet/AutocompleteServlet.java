@@ -6,6 +6,8 @@ import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.model.Star;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -15,12 +17,12 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 @WebServlet("/api/autocomplete")
 public class AutocompleteServlet extends HttpServlet {
+    private static final Logger logger = LoggerFactory.getLogger(AutocompleteServlet.class);
     private MovieService movieService;
     private StarService starService;
 
@@ -51,7 +53,7 @@ public class AutocompleteServlet extends HttpServlet {
                     limit = Math.min(limit, 20); // Max 20 suggestions
                 }
             } catch (NumberFormatException e) {
-                // Use default limit
+                logger.warn("Invalid limit parameter, using default", e);
             }
 
             if (query == null || query.trim().length() < 2) {
@@ -123,11 +125,11 @@ public class AutocompleteServlet extends HttpServlet {
             out.print(result.toString());
 
         } catch (Exception e) {
+            logger.error("Error in doGet for AutocompleteServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Error getting autocomplete suggestions: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 }

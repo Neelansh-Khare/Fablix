@@ -215,6 +215,7 @@ public class CustomerServlet extends HttpServlet {
                     session.setAttribute("customerId", customer.getId());
                     session.setAttribute("customerEmail", customer.getEmail());
                     session.setAttribute("customerName", customer.getFirstName() + " " + customer.getLastName());
+                    session.setAttribute("customerRole", customer.getRole());
 
                     // Set session timeout (30 minutes)
                     session.setMaxInactiveInterval(30 * 60);

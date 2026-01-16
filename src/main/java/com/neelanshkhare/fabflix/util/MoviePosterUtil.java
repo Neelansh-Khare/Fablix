@@ -15,11 +15,12 @@ import java.util.logging.Logger;
 public class MoviePosterUtil {
     private static final Logger LOGGER = Logger.getLogger(MoviePosterUtil.class.getName());
 
-    // Replace with your actual TMDB API key from https://www.themoviedb.org/settings/api
-    private static final String TMDB_API_KEY = "ABC";
+    // Load API key from configuration
+    private static final String TMDB_API_KEY = ConfigUtil.getProperty("tmdb.api.key");
     private static final String TMDB_BASE_URL = "https://api.themoviedb.org/3";
     private static final String TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
     private static final String TMDB_SEARCH_URL = TMDB_BASE_URL + "/search/movie";
+    private static final String TMDB_VIDEO_URL = TMDB_BASE_URL + "/movie/%d/videos";
 
     // Rate limiting
     private static long lastRequestTime = 0;
@@ -28,6 +29,7 @@ public class MoviePosterUtil {
     public static class MoviePosterResult {
         private String posterUrl;
         private String backdropUrl;
+        private String trailerUrl;
         private String overview;
         private double rating;
         private int tmdbId;
@@ -40,6 +42,9 @@ public class MoviePosterUtil {
 
         public String getBackdropUrl() { return backdropUrl; }
         public void setBackdropUrl(String backdropUrl) { this.backdropUrl = backdropUrl; }
+
+        public String getTrailerUrl() { return trailerUrl; }
+        public void setTrailerUrl(String trailerUrl) { this.trailerUrl = trailerUrl; }
 
         public String getOverview() { return overview; }
         public void setOverview(String overview) { this.overview = overview; }
@@ -184,6 +189,13 @@ public class MoviePosterUtil {
 
             if (bestMatch != null) {
                 MoviePosterResult result = parseMovieResult(bestMatch);
+                
+                // Fetch trailer if we have a valid TMDB ID
+                if (result.getTmdbId() > 0) {
+                    String trailerUrl = fetchTrailerUrl(result.getTmdbId());
+                    result.setTrailerUrl(trailerUrl);
+                }
+                
                 LOGGER.fine("Found poster for: " + originalTitle + " -> " +
                         (result.getPosterUrl() != null ? "Success" : "No poster URL"));
                 return result;
@@ -193,6 +205,39 @@ public class MoviePosterUtil {
             LOGGER.log(Level.WARNING, "Error parsing TMDB response for: " + originalTitle, e);
         }
 
+        return null;
+    }
+    
+    private static String fetchTrailerUrl(int tmdbId) {
+        try {
+            // Rate limiting
+            enforceRateLimit();
+            
+            String videoUrl = String.format(TMDB_VIDEO_URL, tmdbId) + "?api_key=" + TMDB_API_KEY;
+            HttpURLConnection connection = createConnection(videoUrl);
+            
+            if (connection.getResponseCode() == 200) {
+                String responseBody = readResponse(connection);
+                JSONObject jsonResponse = new JSONObject(responseBody);
+                JSONArray results = jsonResponse.getJSONArray("results");
+                
+                // Look for YouTube trailer
+                for (int i = 0; i < results.length(); i++) {
+                    JSONObject video = results.getJSONObject(i);
+                    String site = video.optString("site", "");
+                    String type = video.optString("type", "");
+                    
+                    if ("YouTube".equalsIgnoreCase(site) && "Trailer".equalsIgnoreCase(type)) {
+                        String key = video.optString("key");
+                        if (key != null && !key.isEmpty()) {
+                            return "https://www.youtube.com/embed/" + key;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error fetching trailer for TMDB ID: " + tmdbId, e);
+        }
         return null;
     }
 

@@ -4,6 +4,8 @@ import com.neelanshkhare.fabflix.service.MovieService;
 import com.neelanshkhare.fabflix.model.Movie;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -16,6 +18,7 @@ import java.util.List;
 
 @WebServlet("/api/debug/posters")
 public class DebugServlet extends HttpServlet {
+    private static final Logger logger = LoggerFactory.getLogger(DebugServlet.class);
     private MovieService movieService;
 
     @Override
@@ -66,11 +69,11 @@ public class DebugServlet extends HttpServlet {
             out.print(result.toString());
 
         } catch (Exception e) {
+            logger.error("Error checking posters in DebugServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Error checking posters: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 }

@@ -12,6 +12,7 @@ public interface MovieDAO {
     List<Movie> findByStar(String starId);
     List<Movie> searchMovies(String query);
     List<Movie> listMovies(int page, int pageSize);
+    List<Movie> getMoviesWithoutPosters(int limit);
     int countMovies();
     boolean insert(Movie movie);
     boolean update(Movie movie);

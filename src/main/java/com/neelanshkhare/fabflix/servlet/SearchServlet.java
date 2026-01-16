@@ -4,6 +4,8 @@ import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.service.MovieService;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -16,6 +18,7 @@ import java.util.List;
 
 @WebServlet("/api/search")
 public class SearchServlet extends HttpServlet {
+    private static final Logger logger = LoggerFactory.getLogger(SearchServlet.class);
     private MovieService movieService;
 
     @Override
@@ -41,7 +44,7 @@ public class SearchServlet extends HttpServlet {
             String genre = request.getParameter("genre");
             String star = request.getParameter("star");
 
-            List<Movie> movies = null;
+            List<Movie> movies;
 
             // Determine which search to perform based on parameters
             if (query != null && !query.isEmpty()) {
@@ -91,27 +94,30 @@ public class SearchServlet extends HttpServlet {
 
             // Create JSON response with search results
             JSONArray moviesArray = new JSONArray();
-            for (Movie movie : movies) {
-                JSONObject movieObj = new JSONObject();
-                movieObj.put("id", movie.getId());
-                movieObj.put("title", movie.getTitle());
-                movieObj.put("year", movie.getYear());
-                movieObj.put("director", movie.getDirector());
-
-                moviesArray.put(movieObj);
+            if (movies != null) {
+                for (Movie movie : movies) {
+                    JSONObject movieObj = new JSONObject();
+                    movieObj.put("id", movie.getId());
+                    movieObj.put("title", movie.getTitle());
+                    movieObj.put("year", movie.getYear());
+                    movieObj.put("director", movie.getDirector());
+                    movieObj.put("bannerUrl", movie.getBannerUrl());
+                    movieObj.put("trailerUrl", movie.getTrailerUrl());
+                    moviesArray.put(movieObj);
+                }
             }
 
             JSONObject result = new JSONObject();
-            result.put("count", movies.size());
+            result.put("count", movies != null ? movies.size() : 0);
             result.put("movies", moviesArray);
             out.print(result.toString());
 
         } catch (Exception e) {
+            logger.error("Error in doGet for SearchServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 }

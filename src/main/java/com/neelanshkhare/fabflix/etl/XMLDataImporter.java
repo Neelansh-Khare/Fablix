@@ -8,6 +8,8 @@ import com.neelanshkhare.fabflix.service.MovieService;
 import com.neelanshkhare.fabflix.service.StarService;
 import com.neelanshkhare.fabflix.util.XMLParserUtil;
 import org.dom4j.DocumentException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.HashMap;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 public class XMLDataImporter {
+    private static final Logger logger = LoggerFactory.getLogger(XMLDataImporter.class);
     private MovieService movieService;
     private StarService starService;
     private GenreService genreService;
@@ -56,11 +59,10 @@ public class XMLDataImporter {
                 movieService.addMovie(movie);
             }
 
-            System.out.println("Successfully imported " + movies.size() + " movies.");
+            logger.info("Successfully imported {} movies.", movies.size());
 
         } catch (DocumentException e) {
-            System.err.println("Error parsing XML file: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error parsing XML file: {}", moviesXmlFile.getPath(), e);
         }
     }
 
@@ -76,17 +78,16 @@ public class XMLDataImporter {
                 }
             }
 
-            System.out.println("Successfully imported " + successCount + " out of " + stars.size() + " stars.");
+            logger.info("Successfully imported {} out of {} stars.", successCount, stars.size());
 
         } catch (DocumentException e) {
-            System.err.println("Error parsing XML file: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error parsing XML file: {}", starsXmlFile.getPath(), e);
         }
     }
 
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("Usage: java XMLDataImporter <movies_xml_file> <stars_xml_file>");
+            logger.error("Usage: java XMLDataImporter <movies_xml_file> <stars_xml_file>");
             return;
         }
 
@@ -94,7 +95,7 @@ public class XMLDataImporter {
         File starsFile = new File(args[1]);
 
         if (!moviesFile.exists() || !starsFile.exists()) {
-            System.out.println("One or both input files do not exist.");
+            logger.error("One or both input files do not exist.");
             return;
         }
 

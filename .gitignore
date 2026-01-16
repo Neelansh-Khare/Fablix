@@ -47,3 +47,4 @@ build/
 
 # AWS
 .aws/
+src/main/resources/config.properties

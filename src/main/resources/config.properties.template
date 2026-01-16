@@ -1,0 +1,12 @@
+# FabFlix Application Configuration Template
+# Instructions:
+# 1. Copy this file to src/main/resources/config.properties
+# 2. Fill in your actual API keys and secrets below
+# 3. DO NOT commit the resulting config.properties file to version control
+
+# TMDB API Key (Get one at https://www.themoviedb.org/settings/api)
+tmdb.api.key=YOUR_TMDB_API_KEY_HERE
+
+# Google reCAPTCHA Secrets (Get them at https://www.google.com/recaptcha/admin)
+recaptcha.secret.key=YOUR_RECAPTCHA_SECRET_KEY_HERE
+recaptcha.site.key=YOUR_RECAPTCHA_SITE_KEY_HERE

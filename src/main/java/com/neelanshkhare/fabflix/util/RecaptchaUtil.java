@@ -14,11 +14,10 @@ public class RecaptchaUtil {
     private static final Logger LOGGER = Logger.getLogger(RecaptchaUtil.class.getName());
     private static final String RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 
-    // TODO: Replace with your actual secret key from Google reCAPTCHA console
-    private static final String SECRET_KEY = "XYZ"; // Get this from https://www.google.com/recaptcha/admin
+    private static final String SECRET_KEY = ConfigUtil.getProperty("recaptcha.secret.key");
 
     // Site key for frontend (this should match what you use in auth.js)
-    public static final String SITE_KEY = "CYZ"; // Get this from https://www.google.com/recaptcha/admin
+    public static final String SITE_KEY = ConfigUtil.getProperty("recaptcha.site.key");
 
     public static boolean verifyRecaptcha(String gRecaptchaResponse) {
         if (gRecaptchaResponse == null || gRecaptchaResponse.trim().isEmpty()) {

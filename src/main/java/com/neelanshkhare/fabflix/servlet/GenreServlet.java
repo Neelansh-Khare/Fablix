@@ -4,6 +4,8 @@ import com.neelanshkhare.fabflix.model.Genre;
 import com.neelanshkhare.fabflix.service.GenreService;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -16,6 +18,7 @@ import java.util.List;
 
 @WebServlet("/api/genres/*")
 public class GenreServlet extends HttpServlet {
+    private static final Logger logger = LoggerFactory.getLogger(GenreServlet.class);
     private GenreService genreService;
 
     @Override
@@ -44,7 +47,6 @@ public class GenreServlet extends HttpServlet {
                     JSONObject genreObj = new JSONObject();
                     genreObj.put("id", genre.getId());
                     genreObj.put("name", genre.getName());
-
                     genresArray.put(genreObj);
                 }
 
@@ -62,7 +64,6 @@ public class GenreServlet extends HttpServlet {
                         JSONObject genreObj = new JSONObject();
                         genreObj.put("id", genre.getId());
                         genreObj.put("name", genre.getName());
-
                         out.print(genreObj.toString());
                     } else {
                         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -78,11 +79,11 @@ public class GenreServlet extends HttpServlet {
                 }
             }
         } catch (Exception e) {
+            logger.error("Error in doGet for GenreServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -95,12 +96,12 @@ public class GenreServlet extends HttpServlet {
 
         StringBuilder buffer = new StringBuilder();
         String line;
-        try {
-            while ((line = request.getReader().readLine()) != null) {
+        try (java.io.BufferedReader reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
                 buffer.append(line);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error reading request body in GenreServlet", e);
         }
 
         String payload = buffer.toString();
@@ -108,7 +109,6 @@ public class GenreServlet extends HttpServlet {
 
         try {
             JSONObject jsonRequest = new JSONObject(payload);
-
             Genre genre = new Genre();
             genre.setName(jsonRequest.getString("name"));
 
@@ -128,11 +128,11 @@ public class GenreServlet extends HttpServlet {
             }
 
         } catch (Exception e) {
+            logger.error("Error in doPost for GenreServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -156,19 +156,17 @@ public class GenreServlet extends HttpServlet {
 
         try {
             int genreId = Integer.parseInt(pathInfo.substring(1));
-
             StringBuilder buffer = new StringBuilder();
             String line;
-            try {
-                while ((line = request.getReader().readLine()) != null) {
+            try (java.io.BufferedReader reader = request.getReader()) {
+                while ((line = reader.readLine()) != null) {
                     buffer.append(line);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("Error reading request body in GenreServlet", e);
             }
 
             String payload = buffer.toString();
-
             JSONObject jsonRequest = new JSONObject(payload);
 
             Genre genre = new Genre();
@@ -193,11 +191,11 @@ public class GenreServlet extends HttpServlet {
             error.put("message", "Invalid genre ID format");
             out.print(error.toString());
         } catch (Exception e) {
+            logger.error("Error in doPut for GenreServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -239,11 +237,11 @@ public class GenreServlet extends HttpServlet {
             error.put("message", "Invalid genre ID format");
             out.print(error.toString());
         } catch (Exception e) {
+            logger.error("Error in doDelete for GenreServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 }

@@ -6,6 +6,8 @@ import com.neelanshkhare.fabflix.model.Genre;
 import com.neelanshkhare.fabflix.model.Star;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -18,6 +20,7 @@ import java.util.List;
 
 @WebServlet("/api/movies/*")
 public class MovieServlet extends HttpServlet {
+    private static final Logger logger = LoggerFactory.getLogger(MovieServlet.class);
     private MovieService movieService;
 
     @Override
@@ -54,7 +57,7 @@ public class MovieServlet extends HttpServlet {
                         pageSize = Integer.parseInt(pageSizeParam);
                     }
                 } catch (NumberFormatException e) {
-                    // Use default values
+                    logger.warn("Invalid pagination parameters, using defaults", e);
                 }
 
                 List<Movie> movies = movieService.listMovies(page, pageSize);
@@ -73,11 +76,8 @@ public class MovieServlet extends HttpServlet {
                     movieObj.put("title", movie.getTitle());
                     movieObj.put("year", movie.getYear());
                     movieObj.put("director", movie.getDirector());
-
-                    // IMPORTANT: Include banner_url and trailer_url in JSON response
                     movieObj.put("bannerUrl", movie.getBannerUrl());
                     movieObj.put("trailerUrl", movie.getTrailerUrl());
-
                     moviesArray.put(movieObj);
                 }
 
@@ -95,6 +95,8 @@ public class MovieServlet extends HttpServlet {
                     movieObj.put("title", movie.getTitle());
                     movieObj.put("year", movie.getYear());
                     movieObj.put("director", movie.getDirector());
+                    movieObj.put("bannerUrl", movie.getBannerUrl());
+                    movieObj.put("trailerUrl", movie.getTrailerUrl());
 
                     // Add genres
                     JSONArray genresArray = new JSONArray();
@@ -102,7 +104,6 @@ public class MovieServlet extends HttpServlet {
                         JSONObject genreObj = new JSONObject();
                         genreObj.put("id", genre.getId());
                         genreObj.put("name", genre.getName());
-
                         genresArray.put(genreObj);
                     }
                     movieObj.put("genres", genresArray);
@@ -114,7 +115,6 @@ public class MovieServlet extends HttpServlet {
                         starObj.put("id", star.getId());
                         starObj.put("name", star.getName());
                         starObj.put("birthYear", star.getBirthYear());
-
                         starsArray.put(starObj);
                     }
                     movieObj.put("stars", starsArray);
@@ -128,11 +128,11 @@ public class MovieServlet extends HttpServlet {
                 }
             }
         } catch (Exception e) {
+            logger.error("Error in doGet for MovieServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -145,12 +145,12 @@ public class MovieServlet extends HttpServlet {
 
         StringBuilder buffer = new StringBuilder();
         String line;
-        try {
-            while ((line = request.getReader().readLine()) != null) {
+        try (java.io.BufferedReader reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
                 buffer.append(line);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error reading request body in MovieServlet", e);
         }
 
         String payload = buffer.toString();
@@ -178,11 +178,9 @@ public class MovieServlet extends HttpServlet {
                 JSONArray genresArray = jsonRequest.getJSONArray("genres");
                 for (int i = 0; i < genresArray.length(); i++) {
                     JSONObject genreObj = genresArray.getJSONObject(i);
-
                     Genre genre = new Genre();
                     genre.setId(genreObj.getInt("id"));
                     genre.setName(genreObj.getString("name"));
-
                     movie.addGenre(genre);
                 }
             }
@@ -192,11 +190,9 @@ public class MovieServlet extends HttpServlet {
                 JSONArray starsArray = jsonRequest.getJSONArray("stars");
                 for (int i = 0; i < starsArray.length(); i++) {
                     JSONObject starObj = starsArray.getJSONObject(i);
-
                     Star star = new Star();
                     star.setId(starObj.getString("id"));
                     star.setName(starObj.getString("name"));
-
                     movie.addStar(star);
                 }
             }
@@ -217,11 +213,11 @@ public class MovieServlet extends HttpServlet {
             }
 
         } catch (Exception e) {
+            logger.error("Error in doPost for MovieServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -244,15 +240,14 @@ public class MovieServlet extends HttpServlet {
         }
 
         String movieId = pathInfo.substring(1);
-
         StringBuilder buffer = new StringBuilder();
         String line;
-        try {
-            while ((line = request.getReader().readLine()) != null) {
+        try (java.io.BufferedReader reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
                 buffer.append(line);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error reading request body in MovieServlet", e);
         }
 
         String payload = buffer.toString();
@@ -279,10 +274,8 @@ public class MovieServlet extends HttpServlet {
                 JSONArray genresArray = jsonRequest.getJSONArray("genres");
                 for (int i = 0; i < genresArray.length(); i++) {
                     JSONObject genreObj = genresArray.getJSONObject(i);
-
                     Genre genre = new Genre();
                     genre.setId(genreObj.getInt("id"));
-
                     movie.addGenre(genre);
                 }
             }
@@ -292,10 +285,8 @@ public class MovieServlet extends HttpServlet {
                 JSONArray starsArray = jsonRequest.getJSONArray("stars");
                 for (int i = 0; i < starsArray.length(); i++) {
                     JSONObject starObj = starsArray.getJSONObject(i);
-
                     Star star = new Star();
                     star.setId(starObj.getString("id"));
-
                     movie.addStar(star);
                 }
             }
@@ -314,11 +305,11 @@ public class MovieServlet extends HttpServlet {
             }
 
         } catch (Exception e) {
+            logger.error("Error in doPut for MovieServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -357,11 +348,11 @@ public class MovieServlet extends HttpServlet {
             }
 
         } catch (Exception e) {
+            logger.error("Error in doDelete for MovieServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 }

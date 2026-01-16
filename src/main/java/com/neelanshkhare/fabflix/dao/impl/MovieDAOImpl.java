@@ -5,6 +5,8 @@ import com.neelanshkhare.fabflix.model.Genre;
 import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.model.Star;
 import com.neelanshkhare.fabflix.util.DBConnectionUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 public class MovieDAOImpl implements MovieDAO {
+    private static final Logger logger = LoggerFactory.getLogger(MovieDAOImpl.class);
 
     @Override
     public Movie findById(String id) {
@@ -25,67 +28,49 @@ public class MovieDAOImpl implements MovieDAO {
                 "LEFT JOIN genres_in_movies gim ON m.id = gim.movie_id " +
                 "LEFT JOIN genres g ON gim.genre_id = g.id " +
                 "WHERE m.id = ?";
-
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
         Movie movie = null;
 
-        try {
-            conn = DBConnectionUtil.getConnection();
-            stmt = conn.prepareStatement(sql);
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
             stmt.setString(1, id);
-            rs = stmt.executeQuery();
+            try (ResultSet rs = stmt.executeQuery()) {
+                Map<String, Star> starsMap = new HashMap<>();
+                Map<Integer, Genre> genresMap = new HashMap<>();
+                while (rs.next()) {
+                    if (movie == null) {
+                        movie = new Movie();
+                        movie.setId(rs.getString("id"));
+                        movie.setTitle(rs.getString("title"));
+                        movie.setYear(rs.getInt("year"));
+                        movie.setDirector(rs.getString("director"));
+                        movie.setBannerUrl(rs.getString("banner_url"));
+                        movie.setTrailerUrl(rs.getString("trailer_url"));
+                    }
 
-            Map<String, Star> starsMap = new HashMap<>();
-            Map<Integer, Genre> genresMap = new HashMap<>();
+                    String starId = rs.getString("star_id");
+                    if (starId != null && !starsMap.containsKey(starId)) {
+                        Star star = new Star();
+                        star.setId(starId);
+                        star.setName(rs.getString("star_name"));
+                        star.setBirthYear(rs.getObject("star_birth_year") != null ? rs.getInt("star_birth_year") : null);
+                        star.setPhotoUrl(rs.getString("star_photo_url"));
+                        starsMap.put(starId, star);
+                        movie.addStar(star);
+                    }
 
-            while (rs.next()) {
-                if (movie == null) {
-                    movie = new Movie();
-                    movie.setId(rs.getString("id"));
-                    movie.setTitle(rs.getString("title"));
-                    movie.setYear(rs.getInt("year"));
-                    movie.setDirector(rs.getString("director"));
-                    movie.setBannerUrl(rs.getString("banner_url"));
-                    movie.setTrailerUrl(rs.getString("trailer_url"));
-                }
-
-                // Add stars
-                String starId = rs.getString("star_id");
-                if (starId != null && !starsMap.containsKey(starId)) {
-                    Star star = new Star();
-                    star.setId(starId);
-                    star.setName(rs.getString("star_name"));
-                    star.setBirthYear(rs.getObject("star_birth_year") != null ? rs.getInt("star_birth_year") : null);
-                    star.setPhotoUrl(rs.getString("star_photo_url"));
-
-                    starsMap.put(starId, star);
-                    movie.addStar(star);
-                }
-
-                // Add genres
-                Integer genreId = rs.getObject("genre_id") != null ? rs.getInt("genre_id") : null;
-                if (genreId != null && !genresMap.containsKey(genreId)) {
-                    Genre genre = new Genre();
-                    genre.setId(genreId);
-                    genre.setName(rs.getString("genre_name"));
-
-                    genresMap.put(genreId, genre);
-                    movie.addGenre(genre);
+                    Integer genreId = rs.getObject("genre_id") != null ? rs.getInt("genre_id") : null;
+                    if (genreId != null && !genresMap.containsKey(genreId)) {
+                        Genre genre = new Genre();
+                        genre.setId(genreId);
+                        genre.setName(rs.getString("genre_name"));
+                        genresMap.put(genreId, genre);
+                        movie.addGenre(genre);
+                    }
                 }
             }
-
         } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (rs != null) rs.close();
-                if (stmt != null) stmt.close();
-                if (conn != null) DBConnectionUtil.releaseConnection(conn);
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
+            logger.error("Error finding movie by ID: {}", id, e);
         }
 
         return movie;
@@ -133,50 +118,91 @@ public class MovieDAOImpl implements MovieDAO {
     public List<Movie> searchMovies(String query) {
         String sql = "SELECT id, title, year, director, banner_url, trailer_url " +
                 "FROM movies " +
-                "WHERE MATCH (title, director) AGAINST (? IN BOOLEAN MODE) " +
+                "WHERE LOWER(title) LIKE LOWER(?) OR LOWER(director) LIKE LOWER(?) " +
                 "LIMIT 100";
-        return executeMovieQuery(sql, query + "*");
+        List<Movie> movies = new ArrayList<>();
+
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            String searchPattern = "%" + query + "%";
+            stmt.setString(1, searchPattern);
+            stmt.setString(2, searchPattern);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Movie movie = new Movie();
+                    movie.setId(rs.getString("id"));
+                    movie.setTitle(rs.getString("title"));
+                    movie.setYear(rs.getInt("year"));
+                    movie.setDirector(rs.getString("director"));
+                    movie.setBannerUrl(rs.getString("banner_url"));
+                    movie.setTrailerUrl(rs.getString("trailer_url"));
+                    movies.add(movie);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error searching movies with query: {}", query, e);
+        }
+
+        return movies;
     }
 
     @Override
     public List<Movie> listMovies(int page, int pageSize) {
         int offset = (page - 1) * pageSize;
         String sql = "SELECT id, title, year, director, banner_url, trailer_url FROM movies LIMIT ? OFFSET ?";
-
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
         List<Movie> movies = new ArrayList<>();
 
-        try {
-            conn = DBConnectionUtil.getConnection();
-            stmt = conn.prepareStatement(sql);
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
             stmt.setInt(1, pageSize);
             stmt.setInt(2, offset);
-            rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                Movie movie = new Movie();
-                movie.setId(rs.getString("id"));
-                movie.setTitle(rs.getString("title"));
-                movie.setYear(rs.getInt("year"));
-                movie.setDirector(rs.getString("director"));
-                movie.setBannerUrl(rs.getString("banner_url"));
-                movie.setTrailerUrl(rs.getString("trailer_url"));
-
-                movies.add(movie);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Movie movie = new Movie();
+                    movie.setId(rs.getString("id"));
+                    movie.setTitle(rs.getString("title"));
+                    movie.setYear(rs.getInt("year"));
+                    movie.setDirector(rs.getString("director"));
+                    movie.setBannerUrl(rs.getString("banner_url"));
+                    movie.setTrailerUrl(rs.getString("trailer_url"));
+                    movies.add(movie);
+                }
             }
-
         } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (rs != null) rs.close();
-                if (stmt != null) stmt.close();
-                if (conn != null) DBConnectionUtil.releaseConnection(conn);
-            } catch (SQLException e) {
-                e.printStackTrace();
+            logger.error("Error listing movies - page: {}, pageSize: {}", page, pageSize, e);
+        }
+
+        return movies;
+    }
+
+    @Override
+    public List<Movie> getMoviesWithoutPosters(int limit) {
+        String sql = "SELECT id, title, year, director, banner_url, trailer_url FROM movies " +
+                "WHERE banner_url IS NULL OR banner_url = '' " +
+                "OR banner_url LIKE '%no-poster.jpg%' OR banner_url LIKE '%placeholder%' " +
+                "LIMIT ?";
+        List<Movie> movies = new ArrayList<>();
+
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, limit);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Movie movie = new Movie();
+                    movie.setId(rs.getString("id"));
+                    movie.setTitle(rs.getString("title"));
+                    movie.setYear(rs.getInt("year"));
+                    movie.setDirector(rs.getString("director"));
+                    movie.setBannerUrl(rs.getString("banner_url"));
+                    movie.setTrailerUrl(rs.getString("trailer_url"));
+                    movies.add(movie);
+                }
             }
+        } catch (SQLException e) {
+            logger.error("Error getting movies without posters", e);
         }
 
         return movies;
@@ -185,31 +211,17 @@ public class MovieDAOImpl implements MovieDAO {
     @Override
     public int countMovies() {
         String sql = "SELECT COUNT(*) as count FROM movies";
-
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
         int count = 0;
 
-        try {
-            conn = DBConnectionUtil.getConnection();
-            stmt = conn.createStatement();
-            rs = stmt.executeQuery(sql);
-
+        try (Connection conn = DBConnectionUtil.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
             if (rs.next()) {
                 count = rs.getInt("count");
             }
-
         } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (rs != null) rs.close();
-                if (stmt != null) stmt.close();
-                if (conn != null) DBConnectionUtil.releaseConnection(conn);
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
+            logger.error("Error counting movies", e);
         }
 
         return count;
@@ -219,59 +231,39 @@ public class MovieDAOImpl implements MovieDAO {
     public boolean insert(Movie movie) {
         String sql = "INSERT INTO movies (id, title, year, director, banner_url, trailer_url) " +
                 "VALUES (?, ?, ?, ?, ?, ?)";
-
-        Connection conn = null;
-        PreparedStatement stmt = null;
         boolean success = false;
 
-        try {
-            conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getConnection()) {
             conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, movie.getId());
+                stmt.setString(2, movie.getTitle());
+                stmt.setInt(3, movie.getYear());
+                stmt.setString(4, movie.getDirector());
+                stmt.setString(5, movie.getBannerUrl());
+                stmt.setString(6, movie.getTrailerUrl());
 
-            stmt = conn.prepareStatement(sql);
-            stmt.setString(1, movie.getId());
-            stmt.setString(2, movie.getTitle());
-            stmt.setInt(3, movie.getYear());
-            stmt.setString(4, movie.getDirector());
-            stmt.setString(5, movie.getBannerUrl());
-            stmt.setString(6, movie.getTrailerUrl());
-
-            int affectedRows = stmt.executeUpdate();
-
-            if (affectedRows == 1) {
-                // Add stars for the movie
-                if (movie.getStars() != null && !movie.getStars().isEmpty()) {
-                    insertStarsInMovie(conn, movie);
-                }
-
-                // Add genres for the movie
-                if (movie.getGenres() != null && !movie.getGenres().isEmpty()) {
-                    insertGenresInMovie(conn, movie);
-                }
-
-                conn.commit();
-                success = true;
-            } else {
-                conn.rollback();
-            }
-
-        } catch (SQLException e) {
-            try {
-                if (conn != null) conn.rollback();
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-            }
-            e.printStackTrace();
-        } finally {
-            try {
-                if (stmt != null) stmt.close();
-                if (conn != null) {
-                    conn.setAutoCommit(true);
-                    DBConnectionUtil.releaseConnection(conn);
+                int affectedRows = stmt.executeUpdate();
+                if (affectedRows == 1) {
+                    if (movie.getStars() != null && !movie.getStars().isEmpty()) {
+                        insertStarsInMovie(conn, movie);
+                    }
+                    if (movie.getGenres() != null && !movie.getGenres().isEmpty()) {
+                        insertGenresInMovie(conn, movie);
+                    }
+                    conn.commit();
+                    success = true;
+                } else {
+                    conn.rollback();
                 }
             } catch (SQLException e) {
-                e.printStackTrace();
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
             }
+        } catch (SQLException e) {
+            logger.error("Error inserting movie: {}", movie.getId(), e);
         }
 
         return success;
@@ -279,28 +271,24 @@ public class MovieDAOImpl implements MovieDAO {
 
     private void insertStarsInMovie(Connection conn, Movie movie) throws SQLException {
         String sql = "INSERT INTO stars_in_movies (star_id, movie_id) VALUES (?, ?)";
-
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             for (Star star : movie.getStars()) {
                 stmt.setString(1, star.getId());
                 stmt.setString(2, movie.getId());
                 stmt.addBatch();
             }
-
             stmt.executeBatch();
         }
     }
 
     private void insertGenresInMovie(Connection conn, Movie movie) throws SQLException {
         String sql = "INSERT INTO genres_in_movies (genre_id, movie_id) VALUES (?, ?)";
-
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             for (Genre genre : movie.getGenres()) {
                 stmt.setInt(1, genre.getId());
                 stmt.setString(2, movie.getId());
                 stmt.addBatch();
             }
-
             stmt.executeBatch();
         }
     }
@@ -309,61 +297,41 @@ public class MovieDAOImpl implements MovieDAO {
     public boolean update(Movie movie) {
         String sql = "UPDATE movies SET title = ?, year = ?, director = ?, " +
                 "banner_url = ?, trailer_url = ? WHERE id = ?";
-
-        Connection conn = null;
-        PreparedStatement stmt = null;
         boolean success = false;
 
-        try {
-            conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getConnection()) {
             conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, movie.getTitle());
+                stmt.setInt(2, movie.getYear());
+                stmt.setString(3, movie.getDirector());
+                stmt.setString(4, movie.getBannerUrl());
+                stmt.setString(5, movie.getTrailerUrl());
+                stmt.setString(6, movie.getId());
 
-            stmt = conn.prepareStatement(sql);
-            stmt.setString(1, movie.getTitle());
-            stmt.setInt(2, movie.getYear());
-            stmt.setString(3, movie.getDirector());
-            stmt.setString(4, movie.getBannerUrl());
-            stmt.setString(5, movie.getTrailerUrl());
-            stmt.setString(6, movie.getId());
-
-            int affectedRows = stmt.executeUpdate();
-
-            if (affectedRows == 1) {
-                // Update stars (delete all and insert again)
-                deleteStarsInMovie(conn, movie.getId());
-                if (movie.getStars() != null && !movie.getStars().isEmpty()) {
-                    insertStarsInMovie(conn, movie);
-                }
-
-                // Update genres (delete all and insert again)
-                deleteGenresInMovie(conn, movie.getId());
-                if (movie.getGenres() != null && !movie.getGenres().isEmpty()) {
-                    insertGenresInMovie(conn, movie);
-                }
-
-                conn.commit();
-                success = true;
-            } else {
-                conn.rollback();
-            }
-
-        } catch (SQLException e) {
-            try {
-                if (conn != null) conn.rollback();
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-            }
-            e.printStackTrace();
-        } finally {
-            try {
-                if (stmt != null) stmt.close();
-                if (conn != null) {
-                    conn.setAutoCommit(true);
-                    DBConnectionUtil.releaseConnection(conn);
+                int affectedRows = stmt.executeUpdate();
+                if (affectedRows == 1) {
+                    deleteStarsInMovie(conn, movie.getId());
+                    if (movie.getStars() != null && !movie.getStars().isEmpty()) {
+                        insertStarsInMovie(conn, movie);
+                    }
+                    deleteGenresInMovie(conn, movie.getId());
+                    if (movie.getGenres() != null && !movie.getGenres().isEmpty()) {
+                        insertGenresInMovie(conn, movie);
+                    }
+                    conn.commit();
+                    success = true;
+                } else {
+                    conn.rollback();
                 }
             } catch (SQLException e) {
-                e.printStackTrace();
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
             }
+        } catch (SQLException e) {
+            logger.error("Error updating movie ID: {}", movie.getId(), e);
         }
 
         return success;
@@ -371,7 +339,6 @@ public class MovieDAOImpl implements MovieDAO {
 
     private void deleteStarsInMovie(Connection conn, String movieId) throws SQLException {
         String sql = "DELETE FROM stars_in_movies WHERE movie_id = ?";
-
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, movieId);
             stmt.executeUpdate();
@@ -380,7 +347,6 @@ public class MovieDAOImpl implements MovieDAO {
 
     private void deleteGenresInMovie(Connection conn, String movieId) throws SQLException {
         String sql = "DELETE FROM genres_in_movies WHERE movie_id = ?";
-
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, movieId);
             stmt.executeUpdate();
@@ -390,100 +356,62 @@ public class MovieDAOImpl implements MovieDAO {
     @Override
     public boolean delete(String id) {
         String sql = "DELETE FROM movies WHERE id = ?";
-
-        Connection conn = null;
-        PreparedStatement stmt = null;
         boolean success = false;
 
-        try {
-            conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getConnection()) {
             conn.setAutoCommit(false);
-
-            // Delete stars in movie (will be cascaded)
-            deleteStarsInMovie(conn, id);
-
-            // Delete genres in movie (will be cascaded)
-            deleteGenresInMovie(conn, id);
-
-            // Delete the movie
-            stmt = conn.prepareStatement(sql);
-            stmt.setString(1, id);
-
-            int affectedRows = stmt.executeUpdate();
-
-            if (affectedRows == 1) {
-                conn.commit();
-                success = true;
-            } else {
-                conn.rollback();
-            }
-
-        } catch (SQLException e) {
             try {
-                if (conn != null) conn.rollback();
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-            }
-            e.printStackTrace();
-        } finally {
-            try {
-                if (stmt != null) stmt.close();
-                if (conn != null) {
-                    conn.setAutoCommit(true);
-                    DBConnectionUtil.releaseConnection(conn);
+                deleteStarsInMovie(conn, id);
+                deleteGenresInMovie(conn, id);
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setString(1, id);
+                    int affectedRows = stmt.executeUpdate();
+                    if (affectedRows == 1) {
+                        conn.commit();
+                        success = true;
+                    } else {
+                        conn.rollback();
+                    }
                 }
             } catch (SQLException e) {
-                e.printStackTrace();
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
             }
+        } catch (SQLException e) {
+            logger.error("Error deleting movie ID: {}", id, e);
         }
 
         return success;
     }
 
     private List<Movie> executeMovieQuery(String sql, Object param) {
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
         List<Movie> movies = new ArrayList<>();
-
-        try {
-            conn = DBConnectionUtil.getConnection();
-            stmt = conn.prepareStatement(sql);
-
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
             if (param instanceof String) {
                 stmt.setString(1, (String) param);
             } else if (param instanceof Integer) {
                 stmt.setInt(1, (Integer) param);
             }
 
-            rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                Movie movie = new Movie();
-                movie.setId(rs.getString("id"));
-                movie.setTitle(rs.getString("title"));
-                movie.setYear(rs.getInt("year"));
-                movie.setDirector(rs.getString("director"));
-
-                // Make sure to get banner_url and trailer_url
-                movie.setBannerUrl(rs.getString("banner_url"));
-                movie.setTrailerUrl(rs.getString("trailer_url"));
-
-                movies.add(movie);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Movie movie = new Movie();
+                    movie.setId(rs.getString("id"));
+                    movie.setTitle(rs.getString("title"));
+                    movie.setYear(rs.getInt("year"));
+                    movie.setDirector(rs.getString("director"));
+                    movie.setBannerUrl(rs.getString("banner_url"));
+                    movie.setTrailerUrl(rs.getString("trailer_url"));
+                    movies.add(movie);
+                }
             }
-
         } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (rs != null) rs.close();
-                if (stmt != null) stmt.close();
-                if (conn != null) DBConnectionUtil.releaseConnection(conn);
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
+            logger.error("Error executing movie query with param: {}", param, e);
         }
-
         return movies;
     }
 }

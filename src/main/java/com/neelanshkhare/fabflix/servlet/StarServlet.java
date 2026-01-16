@@ -5,6 +5,8 @@ import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.service.StarService;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -17,6 +19,7 @@ import java.util.List;
 
 @WebServlet("/api/stars/*")
 public class StarServlet extends HttpServlet {
+    private static final Logger logger = LoggerFactory.getLogger(StarServlet.class);
     private StarService starService;
 
     @Override
@@ -53,7 +56,7 @@ public class StarServlet extends HttpServlet {
                         pageSize = Integer.parseInt(pageSizeParam);
                     }
                 } catch (NumberFormatException e) {
-                    // Use default values
+                    logger.warn("Invalid pagination parameters, using defaults", e);
                 }
 
                 // Check if search by name is requested
@@ -73,7 +76,6 @@ public class StarServlet extends HttpServlet {
                     starObj.put("name", star.getName());
                     starObj.put("birthYear", star.getBirthYear());
                     starObj.put("photoUrl", star.getPhotoUrl());
-
                     starsArray.put(starObj);
                 }
 
@@ -102,7 +104,6 @@ public class StarServlet extends HttpServlet {
                             movieObj.put("title", movie.getTitle());
                             movieObj.put("year", movie.getYear());
                             movieObj.put("director", movie.getDirector());
-
                             moviesArray.put(movieObj);
                         }
                     }
@@ -117,11 +118,11 @@ public class StarServlet extends HttpServlet {
                 }
             }
         } catch (Exception e) {
+            logger.error("Error in doGet for StarServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -134,12 +135,12 @@ public class StarServlet extends HttpServlet {
 
         StringBuilder buffer = new StringBuilder();
         String line;
-        try {
-            while ((line = request.getReader().readLine()) != null) {
+        try (java.io.BufferedReader reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
                 buffer.append(line);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error reading request body in StarServlet", e);
         }
 
         String payload = buffer.toString();
@@ -176,11 +177,11 @@ public class StarServlet extends HttpServlet {
             }
 
         } catch (Exception e) {
+            logger.error("Error in doPost for StarServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -203,15 +204,14 @@ public class StarServlet extends HttpServlet {
         }
 
         String starId = pathInfo.substring(1);
-
         StringBuilder buffer = new StringBuilder();
         String line;
-        try {
-            while ((line = request.getReader().readLine()) != null) {
+        try (java.io.BufferedReader reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
                 buffer.append(line);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error reading request body in StarServlet", e);
         }
 
         String payload = buffer.toString();
@@ -245,11 +245,11 @@ public class StarServlet extends HttpServlet {
             }
 
         } catch (Exception e) {
+            logger.error("Error in doPut for StarServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 
@@ -288,11 +288,11 @@ public class StarServlet extends HttpServlet {
             }
 
         } catch (Exception e) {
+            logger.error("Error in doDelete for StarServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
             error.put("message", "Internal server error: " + e.getMessage());
             out.print(error.toString());
-            e.printStackTrace();
         }
     }
 }

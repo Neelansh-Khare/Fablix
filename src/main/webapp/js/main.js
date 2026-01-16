@@ -16,10 +16,54 @@ $(document).ready(function() {
 
     // Initialize cart count
     updateCartCount();
-
-    // Add poster admin link (you can remove this in production)
-    addPosterAdminLink();
 });
+
+// Add Loading Overlay Styles
+$('<style>')
+    .prop('type', 'text/css')
+    .html(`
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #e74c3c;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        .loading-text {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 1.2em;
+            color: #333;
+            font-weight: 500;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `)
+    .appendTo('head');
+
+// Add Loading Overlay HTML
+$('body').append(`
+    <div id="loading-overlay" style="display: none;">
+        <div class="loader"></div>
+        <div class="loading-text">Fetching movie posters...</div>
+    </div>
+`);
 
 function checkLoginStatus() {
     $.ajax({
@@ -31,6 +75,11 @@ function checkLoginStatus() {
                 $('#login-section').hide();
                 $('#account-section').show();
                 $('#account-link').text(response.name);
+                
+                // Add poster admin link if user is logged in
+                if (typeof addPosterAdminLink === 'function') {
+                    addPosterAdminLink();
+                }
             } else {
                 // User is not logged in
                 $('#login-section').show();
@@ -38,64 +87,58 @@ function checkLoginStatus() {
             }
         },
         error: function() {
-            // Error checking login status
             console.error('Error checking login status');
         }
     });
 }
 
 function loadHomePage() {
-    // Add cache busting parameter to ensure fresh data
+    // Show loading overlay
+    $('#loading-overlay').fadeIn(200);
+
+    fetchMoviesWithPolling(1, 12);
+}
+
+function fetchMoviesWithPolling(page, pageSize, attempt = 1) {
     const timestamp = new Date().getTime();
 
-    // Fetch featured movies
     $.ajax({
         url: 'api/movies',
         method: 'GET',
-        cache: false,  // Disable jQuery cache
+        cache: false,
         data: {
-            page: 1,
-            pageSize: 12,
-            _t: timestamp  // Cache busting parameter
+            page: page,
+            pageSize: pageSize,
+            _t: timestamp
         },
         success: function(response) {
-            console.log('Movies loaded:', response.movies.length);
-            // Log first movie to check poster URL
-            if (response.movies.length > 0) {
-                console.log('First movie poster URL:', response.movies[0].bannerUrl);
+            const movies = response.movies;
+            const pendingMovies = movies.filter(isPosterPending);
+
+            if (pendingMovies.length > 0 && attempt < 20) { // Max 20 attempts (~10-20 seconds)
+                console.log(`Waiting for ${pendingMovies.length} posters... (Attempt ${attempt})`);
+                setTimeout(() => fetchMoviesWithPolling(page, pageSize, attempt + 1), 1000);
+            } else {
+                // Done waiting or timeout
+                $('#loading-overlay').fadeOut(200);
+                displayMovies(movies);
             }
-            displayMovies(response.movies);
         },
         error: function(xhr, status, error) {
             console.error('Error loading movies:', error);
+            $('#loading-overlay').hide();
             showErrorMessage('Error loading movies. Please try again later.');
         }
     });
 }
 
-// Also add a debug function to check poster status
-function checkPosterStatus() {
-    $.ajax({
-        url: 'api/debug/posters',
-        method: 'GET',
-        cache: false,
-        success: function(response) {
-            console.log('=== POSTER DEBUG INFO ===');
-            console.log('Cache size:', response.cacheSize);
-            console.log('Movies with valid posters:');
-
-            response.movies.forEach(function(movie) {
-                console.log(`${movie.title} (${movie.year}):`,
-                    movie.hasValidPoster ? '✅ HAS POSTER' : '❌ NO POSTER',
-                    movie.bannerUrl);
-            });
-
-            console.log('=== END DEBUG INFO ===');
-        },
-        error: function() {
-            console.error('Failed to get poster debug info');
-        }
-    });
+function isPosterPending(movie) {
+    if (!movie.bannerUrl) return true;
+    if (movie.bannerUrl === 'poster_not_found') return false; // Explicitly failed
+    if (movie.bannerUrl.startsWith('http')) return false; // Success
+    // If it's the default placeholder, it's pending
+    if (movie.bannerUrl.includes('no-poster.jpg') || movie.bannerUrl.includes('placeholder')) return true;
+    return false;
 }
 
 // Enhanced displayMovies with better debugging
@@ -103,13 +146,10 @@ function displayMovies(movies) {
     const container = $('#content-container');
     container.empty();
 
-    // Add header with debug button
+    // Add header
     container.append(`
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2>Featured Movies</h2>
-            <button onclick="checkPosterStatus()" style="padding: 5px 10px; background: #3498db; color: white; border: none; border-radius: 3px; cursor: pointer;">
-                Debug Posters
-            </button>
         </div>
     `);
 
@@ -123,16 +163,13 @@ function displayMovies(movies) {
             !movie.bannerUrl.includes('placeholder') &&
             movie.bannerUrl.startsWith('http');
 
-        console.log(`Movie: ${movie.title}, Poster URL: ${movie.bannerUrl}, Valid: ${hasValidPoster}`);
-
         const card = `
             <div class="movie-card" data-id="${movie.id}">
                 <div class="movie-poster">
                     <img src="${hasValidPoster ? movie.bannerUrl : 'images/no-poster.jpg'}" 
                          alt="${movie.title} poster" 
-                         onerror="this.src='images/no-poster.jpg'; console.error('Failed to load poster for ${movie.title}:', this.src);"
+                         onerror="this.src='images/no-poster.jpg';"
                          onload="console.log('Successfully loaded poster for ${movie.title}');">
-                    ${!hasValidPoster ? '<div class="poster-loading-indicator">🔄 Poster loading...</div>' : ''}
                 </div>
                 <div class="movie-info">
                     <div class="movie-title">${movie.title}</div>
@@ -146,11 +183,6 @@ function displayMovies(movies) {
     });
 
     container.append(grid);
-
-    // Start progressive poster loading for movies without posters
-    if (movies.some(m => !m.bannerUrl || m.bannerUrl.includes('no-poster.jpg'))) {
-        startProgressivePosterLoading();
-    }
 }
 
 function setupEventListeners() {
@@ -348,56 +380,68 @@ function updatePasswordRequirements(password) {
     });
 }
 
-// Shopping Cart Functions
+// Shopping Cart Functions - Server Side
 function addToCart(movieId, movieTitle) {
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
-
-    // Check if movie is already in cart
-    const existingItem = cart.find(item => item.id === movieId);
-
-    if (existingItem) {
-        existingItem.quantity += 1;
-    } else {
-        cart.push({
-            id: movieId,
-            title: movieTitle,
-            quantity: 1,
-            price: 9.99 // Default price
-        });
-    }
-
-    localStorage.setItem('cart', JSON.stringify(cart));
-    showSuccessMessage(`${movieTitle} added to cart!`);
-    updateCartCount();
+    $.ajax({
+        url: 'api/cart',
+        method: 'POST',
+        data: {
+            movieId: movieId,
+            action: 'add',
+            quantity: 1
+        },
+        success: function(response) {
+            showSuccessMessage(`${movieTitle} added to cart!`);
+            updateCartCount();
+        },
+        error: function() {
+            showErrorMessage('Error adding to cart. Please try again.');
+        }
+    });
 }
 
 function updateCartCount() {
-    const cart = JSON.parse(localStorage.getItem('cart')) || [];
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+    $.ajax({
+        url: 'api/cart',
+        method: 'GET',
+        success: function(response) {
+            let totalItems = response.count;
+            let cartLink = $('#cart-link');
+            if (cartLink.length === 0) {
+                // Add cart link if it doesn't exist
+                const cartHtml = `<li><a href="#" id="cart-link">Cart (<span id="cart-count">0</span>)</a></li>`;
+                $('.nav-container ul').append(cartHtml);
+                cartLink = $('#cart-link');
 
-    let cartLink = $('#cart-link');
-    if (cartLink.length === 0) {
-        // Add cart link if it doesn't exist
-        const cartHtml = `<li><a href="#" id="cart-link">Cart (<span id="cart-count">0</span>)</a></li>`;
-        $('.nav-container ul').append(cartHtml);
-        cartLink = $('#cart-link');
-
-        // Re-bind event listener
-        cartLink.click(function(e) {
-            e.preventDefault();
-            loadCart();
-        });
-    }
-
-    $('#cart-count').text(totalItems);
+                // Re-bind event listener
+                cartLink.click(function(e) {
+                    e.preventDefault();
+                    loadCart();
+                });
+            }
+            $('#cart-count').text(totalItems);
+        }
+    });
 }
 
 function loadCart() {
-    const cart = JSON.parse(localStorage.getItem('cart')) || [];
+    $.ajax({
+        url: 'api/cart',
+        method: 'GET',
+        success: function(response) {
+            displayCart(response.items, response.total);
+        },
+        error: function() {
+            showErrorMessage('Error loading cart.');
+        }
+    });
+}
+
+function displayCart(cartItems, total) {
     const container = $('#content-container');
     container.empty();
 
-    if (cart.length === 0) {
+    if (!cartItems || cartItems.length === 0) {
         container.append(`
             <div class="cart-container">
                 <h2>Shopping Cart</h2>
@@ -408,17 +452,13 @@ function loadCart() {
         return;
     }
 
-    let total = 0;
     let cartHtml = `
         <div class="cart-container">
             <h2>Shopping Cart</h2>
             <div class="cart-items">
     `;
 
-    cart.forEach(item => {
-        const itemTotal = item.price * item.quantity;
-        total += itemTotal;
-
+    cartItems.forEach(item => {
         cartHtml += `
             <div class="cart-item" data-id="${item.id}">
                 <div class="item-info">
@@ -426,12 +466,12 @@ function loadCart() {
                     <p>Price: $${item.price.toFixed(2)}</p>
                 </div>
                 <div class="item-controls">
-                    <button class="btn btn-sm decrease-qty" data-id="${item.id}">-</button>
+                    <button class="btn btn-sm decrease-qty" data-id="${item.id}" data-qty="${item.quantity}">-</button>
                     <span class="quantity">${item.quantity}</span>
-                    <button class="btn btn-sm increase-qty" data-id="${item.id}">+</button>
+                    <button class="btn btn-sm increase-qty" data-id="${item.id}" data-qty="${item.quantity}">+</button>
                     <button class="btn btn-danger remove-item" data-id="${item.id}">Remove</button>
                 </div>
-                <div class="item-total">$${itemTotal.toFixed(2)}</div>
+                <div class="item-total">$${item.total.toFixed(2)}</div>
             </div>
         `;
     });
@@ -447,20 +487,20 @@ function loadCart() {
     `;
 
     container.append(cartHtml);
-
-    // Bind cart event listeners
     bindCartEventListeners();
 }
 
 function bindCartEventListeners() {
     $('.increase-qty').click(function() {
         const movieId = $(this).data('id');
-        updateCartQuantity(movieId, 1);
+        const currentQty = $(this).data('qty');
+        updateCartQuantity(movieId, currentQty + 1);
     });
 
     $('.decrease-qty').click(function() {
         const movieId = $(this).data('id');
-        updateCartQuantity(movieId, -1);
+        const currentQty = $(this).data('qty');
+        updateCartQuantity(movieId, currentQty - 1);
     });
 
     $('.remove-item').click(function() {
@@ -469,28 +509,46 @@ function bindCartEventListeners() {
     });
 }
 
-function updateCartQuantity(movieId, change) {
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
-    const item = cart.find(item => item.id === movieId);
-
-    if (item) {
-        item.quantity += change;
-        if (item.quantity <= 0) {
-            cart = cart.filter(item => item.id !== movieId);
-        }
+function updateCartQuantity(movieId, newQuantity) {
+    if (newQuantity <= 0) {
+        removeFromCart(movieId);
+        return;
     }
-
-    localStorage.setItem('cart', JSON.stringify(cart));
-    loadCart();
-    updateCartCount();
+    
+    $.ajax({
+        url: 'api/cart',
+        method: 'POST',
+        data: {
+            movieId: movieId,
+            action: 'update',
+            quantity: newQuantity
+        },
+        success: function(response) {
+            loadCart(); // Reload to refresh totals
+            updateCartCount();
+        },
+        error: function() {
+            showErrorMessage('Error updating cart.');
+        }
+    });
 }
 
 function removeFromCart(movieId) {
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
-    cart = cart.filter(item => item.id !== movieId);
-    localStorage.setItem('cart', JSON.stringify(cart));
-    loadCart();
-    updateCartCount();
+    $.ajax({
+        url: 'api/cart',
+        method: 'POST',
+        data: {
+            movieId: movieId,
+            action: 'remove'
+        },
+        success: function(response) {
+            loadCart();
+            updateCartCount();
+        },
+        error: function() {
+            showErrorMessage('Error removing item.');
+        }
+    });
 }
 
 function proceedToCheckout() {
@@ -513,16 +571,25 @@ function proceedToCheckout() {
 }
 
 function loadCheckout() {
-    const cart = JSON.parse(localStorage.getItem('cart')) || [];
-    if (cart.length === 0) {
-        showErrorMessage('Your cart is empty.');
-        return;
-    }
+    $.ajax({
+        url: 'api/cart',
+        method: 'GET',
+        success: function(response) {
+            if (!response.items || response.items.length === 0) {
+                showErrorMessage('Your cart is empty.');
+                return;
+            }
+            displayCheckout(response.items, response.total);
+        },
+        error: function() {
+            showErrorMessage('Error loading checkout.');
+        }
+    });
+}
 
+function displayCheckout(cartItems, total) {
     const container = $('#content-container');
     container.empty();
-
-    let total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
     const checkoutHtml = `
         <div class="checkout-container">
@@ -530,10 +597,10 @@ function loadCheckout() {
             <div class="checkout-content">
                 <div class="order-summary">
                     <h3>Order Summary</h3>
-                    ${cart.map(item => `
+                    ${cartItems.map(item => `
                         <div class="order-item">
                             <span>${item.title} x ${item.quantity}</span>
-                            <span>$${(item.price * item.quantity).toFixed(2)}</span>
+                            <span>$${item.total.toFixed(2)}</span>
                         </div>
                     `).join('')}
                     <div class="order-total">
@@ -579,40 +646,42 @@ function loadCheckout() {
 }
 
 function processPayment() {
-    const cart = JSON.parse(localStorage.getItem('cart')) || [];
-    const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-    const orderData = {
-        items: cart,
-        total: total,
+    showSuccessMessage('Processing payment...');
+    
+    const formData = {
         creditCard: $('#checkout-cc').val(),
         expirationDate: $('#checkout-exp').val(),
         cvv: $('#checkout-cvv').val(),
         cardholderName: $('#checkout-name').val()
     };
 
-    // Simulate payment processing
-    showSuccessMessage('Processing payment...');
-
-    setTimeout(function() {
-        // Clear cart
-        localStorage.removeItem('cart');
-        updateCartCount();
-
-        // Show success message
-        const container = $('#content-container');
-        container.empty();
-        container.append(`
-            <div class="order-confirmation">
-                <h2>Order Confirmed!</h2>
-                <p>Thank you for your purchase. Your order has been processed successfully.</p>
-                <p>Order Total: $${total.toFixed(2)}</p>
-                <button class="btn btn-primary" onclick="loadHomePage()">Continue Shopping</button>
-            </div>
-        `);
-
-        showSuccessMessage('Payment successful! Thank you for your purchase.');
-    }, 2000);
+    $.ajax({
+        url: 'api/checkout',
+        method: 'POST',
+        data: formData,
+        success: function(response) {
+            updateCartCount();
+            
+            const container = $('#content-container');
+            container.empty();
+            container.append(`
+                <div class="order-confirmation">
+                    <h2>Order Confirmed!</h2>
+                    <p>Thank you for your purchase. Your order has been processed successfully.</p>
+                    <p>Order ID: #${response.orderId}</p>
+                    <button class="btn btn-primary" onclick="loadHomePage()">Continue Shopping</button>
+                </div>
+            `);
+            showSuccessMessage('Payment successful!');
+        },
+        error: function(xhr) {
+            let errorMsg = 'Payment failed.';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMsg = xhr.responseJSON.message;
+            }
+            showErrorMessage(errorMsg);
+        }
+    });
 }
 
 // Initialize cart count on page load
@@ -734,11 +803,20 @@ function displayMovieDetails(movie) {
     const container = $('#content-container');
     container.empty();
 
+    // Determine valid poster URL
+    const hasValidPoster = movie.bannerUrl &&
+        movie.bannerUrl !== 'poster_not_found' &&
+        !movie.bannerUrl.includes('no-poster.jpg') &&
+        !movie.bannerUrl.includes('placeholder') &&
+        movie.bannerUrl.startsWith('http');
+
+    const posterUrl = hasValidPoster ? movie.bannerUrl : 'images/no-poster.jpg';
+
     // Create movie detail section
     const detailHtml = `
         <div class="movie-detail">
             <div class="movie-detail-poster">
-                <img src="${movie.bannerUrl || 'images/no-poster.jpg'}" alt="${movie.title} poster" onerror="this.src='images/no-poster.jpg'">
+                <img src="${posterUrl}" alt="${movie.title} poster" onerror="this.src='images/no-poster.jpg'">
             </div>
             <div class="movie-detail-info">
                 <h1 class="movie-detail-title">${movie.title}</h1>

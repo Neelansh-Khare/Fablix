@@ -20,7 +20,7 @@ A deeper dive into the project's integration points and comparison with the `.we
 
 *   **Database Broken (Critical):** You mentioned, "I also believe i broke the Database and it doesn’t exist so how would i get it back online with some basic data." This is the most immediate and critical issue, as the application cannot function without a database.
 *   **Poster Implementation Bug (High Priority):** You explicitly requested fixing this. While `MovieService` attempts asynchronous fetching, there might be issues with:
-    *   The `TMDB_API_KEY` being invalid or missing.
+    *   The `TMDB_API_KEY` being invalid or misssing.
     *   The `MoviePosterUtil`'s parsing or URL construction.
     *   The `MovieDAOImpl`'s update logic for `banner_url`/`trailer_url`.
     *   Frontend display logic in `main.js` (e.g., `onerror` handling, placeholder logic).

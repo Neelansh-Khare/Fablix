@@ -104,28 +104,22 @@ public class PosterUpdateServlet extends HttpServlet {
                 }
             } else if ("true".equals(batchUpdate)) {
                 // Batch update movies without posters
-                List<Movie> movies = movieService.listMovies(1, limit);
+                List<Movie> movies = movieService.getMoviesWithoutPosters(limit);
 
                 LOGGER.info("Starting batch poster update for " + movies.size() + " movies");
 
                 for (Movie movie : movies) {
                     try {
-                        // Only update if no poster URL exists or it's a placeholder
-                        if (movie.getBannerUrl() == null || movie.getBannerUrl().isEmpty() ||
-                                movie.getBannerUrl().contains("no-poster.jpg") ||
-                                movie.getBannerUrl().contains("placeholder")) {
-
-                            boolean success = updateMoviePoster(movie);
-                            if (success) {
-                                updatedCount++;
-                                LOGGER.info("Updated poster for: " + movie.getTitle());
-                            } else {
-                                errorCount++;
-                            }
-
-                            // Add delay to avoid hitting API rate limits (TMDB allows 40 requests per 10 seconds)
-                            Thread.sleep(300); // 300ms delay between requests
+                        boolean success = updateMoviePoster(movie);
+                        if (success) {
+                            updatedCount++;
+                            LOGGER.info("Updated poster for: " + movie.getTitle());
+                        } else {
+                            errorCount++;
                         }
+
+                        // Add delay to avoid hitting API rate limits (TMDB allows 40 requests per 10 seconds)
+                        Thread.sleep(300); // 300ms delay between requests
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         LOGGER.warning("Batch update interrupted");
@@ -193,12 +187,12 @@ public class PosterUpdateServlet extends HttpServlet {
                     LOGGER.info("No poster URL found for: " + movie.getTitle());
                 }
 
-                // Update backdrop/trailer URL if available and current is empty
-                if (posterResult.getBackdropUrl() != null &&
+                // Update trailer URL if available
+                if (posterResult.getTrailerUrl() != null &&
                         (movie.getTrailerUrl() == null || movie.getTrailerUrl().isEmpty())) {
-                    movie.setTrailerUrl(posterResult.getBackdropUrl());
+                    movie.setTrailerUrl(posterResult.getTrailerUrl());
                     movieUpdated = true;
-                    LOGGER.info("Added backdrop URL as trailer for " + movie.getTitle());
+                    LOGGER.info("Added trailer URL for " + movie.getTitle());
                 }
 
                 // Save updated movie if any changes were made

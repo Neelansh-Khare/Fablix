@@ -8,11 +8,10 @@ public class Customer {
     private String address;
     private String email;
     private String password;
-    private String salt;
+    private String role;
 
     public Customer() {}
 
-    // Getters and setters
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
 
@@ -34,6 +33,6 @@ public class Customer {
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
-    public String getSalt() { return salt; }
-    public void setSalt(String salt) { this.salt = salt; }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 }
