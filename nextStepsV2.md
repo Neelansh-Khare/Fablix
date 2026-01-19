@@ -1,86 +1,54 @@
-# FabFlix Project Development Roadmap V2 (2025-12-29)
+# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-01-19
 
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
-## 1. Current Status Overview
-*   **Architecture:** Java Servlets + JSP + MySQL + jQuery Frontend.
-*   **Authentication:** Functional but has security flaws (hardcoded keys, basic hashing).
-*   **Posters:** Asynchronous fetching implemented but relies on hardcoded keys and in-memory caching.
-*   **Cart/Checkout:** Currently **Client-Side Only** (localStorage). This is a major limitation for a real-world app.
-*   **Database:** `movie-data.sql` and `sample_data.sql` exist for recovery. Connection pooling is custom (should be HikariCP).
+## 0. Completed Tasks (Recently Done)
+*   **[x] Database Recovery & Stability (2.1):** PostgreSQL database is operational with HikariCP connection pooling.
+*   **[x] Security - Externalize Secrets (2.2):** `ConfigUtil` now reads from `config.properties` or Environment Variables (TMDB_API_KEY, RECAPTCHA_SECRET).
+*   **[x] Fix Poster Implementation (2.3):** `MoviePosterUtil` implemented with rate limiting, better error handling, and TMDB integration.
+*   **[x] Server-Side Cart & Checkout (3.1):** `CartServlet` and `CheckoutServlet` implemented. Cart persists in session/database.
+*   **[x] Authentication Hardening (3.2):** Upgraded to **BCrypt** hashing in `SecurityUtil`. `AdminFilter` implemented for authorization.
+*   **[x] Infrastructure (5.1 - Partial):** **HikariCP** integrated for connection pooling. **SLF4J/Logback** logging implemented throughout the project.
 
 ---
 
-## 2. Immediate Critical Fixes (Priority 0)
+## 1. Current Status Overview
+*   **Architecture:** Java Servlets + JSP + PostgreSQL + jQuery Frontend.
+*   **Authentication:** BCrypt-based security. `AdminFilter` protects admin routes.
+*   **Posters:** Robust TMDB integration with caching and rate limiting.
+*   **Cart/Checkout:** Server-side implementation with `CartServlet`.
+*   **Database:** HikariCP connection pooling enabled.
 
-### 2.1. Database Recovery & Stability
-*   **Task:** Ensure the MySQL database is up and running.
-*   **Action:** Run `sample_data.sql` or `movie-data.sql` to restore the schema and data.
-*   **Verify:** Check `db.properties` configuration.
+---
 
-### 2.2. Security: Externalize Secrets
-*   **Problem:** `TMDB_API_KEY` (MoviePosterUtil) and `RECAPTCHA_SECRET` (RecaptchaUtil) are hardcoded.
-*   **Action:**
-    1.  Create a `.env` file or use environment variables.
-    2.  Update `MoviePosterUtil` and `RecaptchaUtil` to read from `System.getenv()` or a secure properties file not in git.
-
-### 2.3. Fix Poster Implementation
-*   **Problem:** User reported bugs. Potential causes: Invalid API key, rate limiting, or async thread pool issues.
-*   **Action:**
-    1.  Verify TMDB API Key is valid.
-    2.  Add better error logging in `MovieService.fetchPosterAsync`.
-    3.  Ensure `posterFetchCache` invalidates correctly if a fetch fails.
+## 2. Immediate Tasks (Priority 0) - COMPLETED
 
 ---
 
 ## 3. Core Feature Implementation (Priority 1)
 
-### 3.05 Misc Updates
-* **Task:** Fix Recaptcha, unable to login rightnow. site key must be updated
-* **Action:** Login as admin and populate all movie posters
-* **Task:** Then remove poster admin
-
-### 3.1. Server-Side Cart & Checkout (Major Task)
-*   **Current State:** Cart lives in browser `localStorage`.
-*   **Goal:** Persist cart in Server Session (and eventually Database).
-*   **Plan:**
-    1.  **Session Cart:** Create `Cart` class and store it in `HttpSession`.
-    2.  **API Endpoints:** Create `CartServlet` (`/api/cart`) to handle `add`, `remove`, `update`, `view` on the server.
-    3.  **Frontend Update:** Modify `main.js` to call `/api/cart` instead of manipulating `localStorage`.
-    4.  **Checkout:** Implement `CheckoutServlet` to:
-        *   Validate User Session.
-        *   Create `Order` in DB (requires `OrderDAO`).
-        *   Save `OrderItems` in DB.
-        *   Clear Session Cart.
-
-### 3.2. Authentication Hardening
-
-*   **Task:** Upgrade Password Security.
-*   **Action:** Replace SHA-256 with **Argon2** or **BCrypt** (using libraries like Bouncy Castle or jBCrypt).
-*   **Task:** Admin Authorization.
-*   **Action:** Implement `AdminFilter` to protect `/_dashboard` or administrative servlets.
+### 3.05 Automated Poster Population & Misc Updates
+* **Task:** Fix Recaptcha (ensure site key is updated in frontend and matched in `RecaptchaUtil`).
+* **Task:** Automate Poster Population (Replace Manual Admin Step).
+    *   **Context:** Manual population is not scalable for new deployments.
+    *   **Action:** Implement a `ServletContextListener` (Background Job) that:
+        1.  Scans the database on startup for movies without posters.
+        2.  Asynchronously fetches posters from TMDB (respecting rate limits).
+        3.  Updates the database/cache with the new URLs.
+        4.  (Optional) Periodically checks for new movie additions.
 
 ---
 
 ## 4. Advanced Architecture: Redis & Netflix-Style Caching (Priority 2)
 
-You requested to explore Redis and understand how Netflix handles this.
-
-### 4.1. Netflix Production Insight
-Netflix uses a tiered caching strategy:
-*   **EVCache (Memcached-based):** Primary distributed key-value store for caching request responses (user history, recommendations). It handles massive scale.
-*   **Redis:** Used for more complex data structures, sorted sets (e.g., "Top 10" lists), and specific high-speed use cases where persistence/replication features of Redis are needed over Memcached.
-*   **Pattern:** They use "Write-Behind" or "Write-Through" caching where data is written to the cache and DB asynchronously or synchronously.
-
-### 4.2. Redis Integration Plan for FabFlix
+### 4.1. Redis Integration Plan for FabFlix
 We will integrate Redis to solve two specific problems, moving us closer to a "Netflix-lite" architecture:
 
 1.  **Distributed Session Store:**
-    *   *Why:* If we scale to 2 Tomcat servers, a user logged into Server A isn't logged into Server B.
-    *   *Fix:* Use **Redis for Session Management**. Tomcat can be configured to store `HttpSession` data in Redis.
-2.  **Application Caching (Replacing `ConcurrentHashMap`):**
-    *   *Current:* `MovieService` uses a local Java `ConcurrentHashMap` for posters. This memory is lost on restart and not shared between servers.
-    *   *Fix:* Use **Jedis** or **Lettuce** (Java Redis clients) to store:
+    *   *Why:* Prepare for horizontal scaling (multiple Tomcat instances).
+    *   *Fix:* Use **Redis for Session Management**.
+2.  **Application Caching (Replacing local caches):**
+    *   *Fix:* Use **Jedis** or **Lettuce** to store:
         *   Poster URLs (`Key: movie_poster:{id} -> Value: url`)
         *   Autocomplete results (`Key: autocomplete:{query} -> Value: json_list`)
     *   *Benefit:* Persistent cache, faster restarts, shared state.
@@ -96,9 +64,10 @@ We will integrate Redis to solve two specific problems, moving us closer to a "N
 ## 5. Production Readiness & DevOps (Priority 3)
 
 ### 5.1. Critical Infrastructure
-*   **Connection Pooling:** Replace custom `DBConnectionUtil` with **HikariCP** (already in `pom.xml`).
-*   **HTTPS Implementation:** Configure Tomcat to serve content over HTTPS (Self-signed for local, Certificate for Prod). Crucial for security.
-*   **Logging & Error Handling:** Replace `e.printStackTrace()` with structured logging (SLF4J/Logback). Implement global error handling to stop swallowing exceptions.
+*   **[x] Connection Pooling:** Replaced custom `DBConnectionUtil` with **HikariCP**.
+*   **[x] Logging & Error Handling:** Replaced `e.printStackTrace()` with structured logging (SLF4J/Logback).
+*   **HTTPS Implementation:** Configure Tomcat to serve content over HTTPS (Self-signed for local, Certificate for Prod).
+*   **Global Exception Handling:** Implement a `Filter` or custom error pages in `web.xml` to handle 404/500 errors gracefully.
 
 ### 5.2. AWS Deployment
 *   **EC2 Deployment:** Deploy to AWS EC2 (Free Tier).
@@ -111,16 +80,12 @@ We will integrate Redis to solve two specific problems, moving us closer to a "N
 ## 6. Advanced Database & Scalability (Priority 4)
 
 ### 6.1. Database Optimization
-*   **Stored Procedures:** Move complex logic (e.g., insertion of movies/stars/genres) into MySQL Stored Procedures for performance and encapsulation.
-*   **Full-Text Search:** Verify and optimize the `MATCH AGAINST` syntax for movie searching. Ensure indices are correctly applied.
-*   **MySQL Replication:** Implement Master-Slave replication. Configure the application (via HikariCP or custom logic) to direct Writes to Master and Reads to Slaves.
+*   **Stored Procedures:** Move complex logic into PostgreSQL Stored Procedures.
+*   **Full-Text Search:** Optimize `MATCH AGAINST` syntax for movie searching.
+*   **PostgreSQL Replication:** Implement Master-Slave replication.
 
-### 6.2. Containerization (Long Term)
-*   **Kubernetes:** Containerize the application (Docker) and deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.
+### 6.2. Containerization (Long Term)                                                                                                                                                                                                                                                                     │
+ *   **Kubernetes:** Containerize the application (Docker) and deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.                                                                                                                                                       │
+
 
 ---
-
-## Summary of Next Steps for You (User)
-1.  **Confirm Database:** Is your MySQL running and populated?
-2.  **Secrets:** Do you have a valid TMDB API Key?
-3.  **Choice:** Do you want to start with **fixing the existing Poster/Auth bugs** OR **implementing the Redis integration** immediately?
