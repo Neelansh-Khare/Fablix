@@ -46,18 +46,30 @@ Assuming you are in the project root directory:
 psql -U neelanshkhare -d fabflix -f createtable.sql
 
 # 2. Import Initial Data (Choose ONE)
-# Option A: Full Data (if available)
-# psql -U neelanshkhare -d fabflix -f movie-data.sql
-# Option B: Sample Data (Recommended for dev)
-psql -U neelanshkhare -d fabflix -f sample_data.sql
+# Option A: Full Data (recommended)
+psql -U neelanshkhare -d fabflix -f movie-data.sql
+# Option B: Sample Data (minimal test data)
+# psql -U neelanshkhare -d fabflix -f sample_data.sql
 
 # 3. Apply Schema Updates (Critical for features like Checkout/Auth)
 psql -U neelanshkhare -d fabflix -f src/main/resources/update_schema_orders.sql
-# Run auth update if needed (check content of update_schema_auth.sql first)
 psql -U neelanshkhare -d fabflix -f src/main/resources/update_schema_auth.sql
+
+# 4. IMPORTANT: Reset sequences after bulk insert
+# This fixes "duplicate key" errors when creating orders or new users
+psql -U neelanshkhare -d fabflix -f reset_sequences.sql
+
+# 5. Migrate plaintext passwords to BCrypt (requires built project)
+# First build the project:
+mvn clean package
+# Then run the migration:
+java -cp "target/fabflix/WEB-INF/lib/*;target/classes" ^
+     com.neelanshkhare.fabflix.util.PasswordMigration
 ```
 
 **Note:** If `psql` asks for a password, enter `password` (or whatever you set in Step B).
+
+**Note:** The password migration step is required because `movie-data.sql` contains plaintext passwords, but the application uses BCrypt for authentication.
 
 ## 3. Configuration
 
@@ -97,6 +109,35 @@ RECAPTCHA_SITE_KEY=your_recaptcha_site_key_here
     *(Note: Check `pom.xml` for the specific run command plugin version).*
 
 ## 5. Troubleshooting
+
+### Connection Issues
 *   **Connection Refused:** Ensure PostgreSQL service is running in Windows Services (`services.msc`).
 *   **Role does not exist:** Did you create the `neelanshkhare` user?
 *   **Relation does not exist:** Did you run the scripts against the `fabflix` database (and not `postgres` default db)?
+
+### Authentication Issues
+*   **Login fails with valid credentials:** Passwords in `movie-data.sql` are plaintext. Run the password migration utility (Step C.5) to convert them to BCrypt hashes.
+*   **"Invalid BCrypt hash" in logs:** Same issue - run password migration.
+
+### Order/Checkout Issues
+*   **"duplicate key value violates unique constraint 'sales_pkey'":** The `sales_id_seq` sequence is out of sync. Run:
+    ```powershell
+    psql -U neelanshkhare -d fabflix -f reset_sequences.sql
+    ```
+*   **Same error for customers:** Run the same script - it resets all sequences.
+
+### TMDB Poster Issues
+*   **"TMDB API authentication failed":** Your API key is invalid. Get a new one from https://www.themoviedb.org/settings/api and update `config.properties`.
+*   **Posters not loading:** Check that `tmdb.api.key` is set correctly in `src/main/resources/config.properties`.
+
+## 6. Test Credentials
+
+After running the password migration, you can log in with:
+
+| Email | Password |
+|-------|----------|
+| jbrown@ics185.edu | keyboard |
+| jblack@ics185.edu | paper |
+| kwhite@ics185.edu | book |
+| ksmith@ics185.edu | light |
+| jharris@ics185.edu | honey |

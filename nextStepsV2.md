@@ -1,4 +1,4 @@
-# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-01-19
+# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-01-26
 
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
@@ -9,6 +9,11 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **[x] Server-Side Cart & Checkout (3.1):** `CartServlet` and `CheckoutServlet` implemented. Cart persists in session/database.
 *   **[x] Authentication Hardening (3.2):** Upgraded to **BCrypt** hashing in `SecurityUtil`. `AdminFilter` implemented for authorization.
 *   **[x] Infrastructure (5.1 - Partial):** **HikariCP** integrated for connection pooling. **SLF4J/Logback** logging implemented throughout the project.
+*   **[x] Database Scripts & Tooling (2026-01-26):**
+    *   Created `reset_sequences.sql` - Fixes PostgreSQL SERIAL sequence misalignment after bulk inserts.
+    *   Created `PasswordMigration.java` - Migrates legacy plaintext passwords to BCrypt hashes.
+    *   Created `setup_database.sh` - Complete database setup script (tables + data + sequences + passwords).
+    *   Fixed checkout order creation bug caused by out-of-sync `sales_id_seq`.
 
 ---
 
@@ -27,15 +32,14 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 
 ## 3. Core Feature Implementation (Priority 1)
 
-### 3.05 Automated Poster Population & Misc Updates
-* **Task:** Fix Recaptcha (ensure site key is updated in frontend and matched in `RecaptchaUtil`).
-* **Task:** Automate Poster Population (Replace Manual Admin Step).
-    *   **Context:** Manual population is not scalable for new deployments.
-    *   **Action:** Implement a `ServletContextListener` (Background Job) that:
-        1.  Scans the database on startup for movies without posters.
-        2.  Asynchronously fetches posters from TMDB (respecting rate limits).
-        3.  Updates the database/cache with the new URLs.
-        4.  (Optional) Periodically checks for new movie additions.
+### 3.05 Automated Poster Population & Misc Updates - COMPLETED (2026-01-26)
+* **[x] Task:** Fix Recaptcha - Already correctly implemented. Site key is dynamically fetched from `/api/config` endpoint. Test keys configured for development.
+* **[x] Task:** Automate Poster Population - Implemented `PosterPopulationListener` (`ServletContextListener`):
+    *   Scans the database on startup for movies without posters (after 10s delay).
+    *   Asynchronously fetches posters from TMDB (300ms between requests, respecting rate limits).
+    *   Updates the database with poster and trailer URLs.
+    *   Periodic check every 6 hours for new movie additions.
+    *   **File:** `src/main/java/com/neelanshkhare/fabflix/listener/PosterPopulationListener.java`
 
 ---
 
@@ -84,8 +88,22 @@ We will integrate Redis to solve two specific problems, moving us closer to a "N
 *   **Full-Text Search:** Optimize `MATCH AGAINST` syntax for movie searching.
 *   **PostgreSQL Replication:** Implement Master-Slave replication.
 
-### 6.2. Containerization (Long Term)                                                                                                                                                                                                                                                                     │
- *   **Kubernetes:** Containerize the application (Docker) and deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.                                                                                                                                                       │
+### 6.2. Containerization (Long Term)
+*   **Kubernetes:** Containerize the application (Docker) and deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.
 
+---
+
+## 7. User Recommendations (Priority 5)
+
+### 7.1. Simple Recommendation Engine
+*   **Collaborative Filtering (Basic):** Recommend movies based on what similar users have purchased/rated.
+*   **Content-Based Filtering:** Recommend movies based on genres, directors, or stars from the user's purchase history.
+*   **"Users who bought X also bought Y":** Simple co-purchase analysis stored in a recommendations table.
+
+### 7.2. Implementation Steps
+1.  Create `recommendations` table to store precomputed recommendations.
+2.  Implement `RecommendationService` to generate recommendations based on user history.
+3.  Add recommendation display on movie detail pages and user dashboard.
+4.  (Optional) Periodic batch job to refresh recommendations.
 
 ---

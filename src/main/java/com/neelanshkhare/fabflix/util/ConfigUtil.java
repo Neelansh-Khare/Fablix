@@ -33,11 +33,12 @@ public class ConfigUtil {
         String envKey = key.toUpperCase().replace('.', '_');
         String envValue = System.getenv(envKey);
         if (envValue != null && !envValue.isEmpty()) {
-            return envValue;
+            return envValue.trim();
         }
 
-        // 2. Try Properties file
-        return properties.getProperty(key);
+        // 2. Try Properties file (trim to remove accidental whitespace)
+        String value = properties.getProperty(key);
+        return value != null ? value.trim() : null;
     }
 
     public static String getProperty(String key, String defaultValue) {
