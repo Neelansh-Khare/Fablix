@@ -5,7 +5,11 @@
       "Bash(psql:*)",
       "Bash(java:*)",
       "Bash(mvn clean package:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(mvn clean:*)",
+      "Bash(mvn package:*)"
     ]
   }
 }

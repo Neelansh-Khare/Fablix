@@ -2,6 +2,8 @@ package com.neelanshkhare.fabflix.util;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -9,11 +11,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class MoviePosterUtil {
-    private static final Logger LOGGER = Logger.getLogger(MoviePosterUtil.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(MoviePosterUtil.class);
 
     // Load API key from configuration
     private static final String TMDB_API_KEY = ConfigUtil.getProperty("tmdb.api.key");
@@ -58,15 +58,34 @@ public class MoviePosterUtil {
 
     public static MoviePosterResult searchMoviePoster(String movieTitle, Integer year) {
         if (!isApiKeyConfigured()) {
-            LOGGER.warning("TMDB API key not configured properly");
+            LOGGER.warn("TMDB API key not configured properly");
             return null;
         }
 
         // Input validation
         if (movieTitle == null || movieTitle.trim().isEmpty()) {
-            LOGGER.warning("Movie title is empty or null");
+            LOGGER.warn("Movie title is empty or null");
             return null;
         }
+
+        // Check Redis cache first
+        String cacheKey = RedisUtil.POSTER_KEY_PREFIX + movieTitle + (year != null ? ":" + year : "");
+        String cachedData = RedisUtil.get(cacheKey);
+
+        if (cachedData != null && !cachedData.isEmpty()) {
+            try {
+                MoviePosterResult cachedResult = deserializeFromJson(cachedData);
+                if (cachedResult != null) {
+                    LOGGER.debug("Cache HIT for movie: {} ({})", movieTitle, year);
+                    return cachedResult;
+                }
+            } catch (Exception e) {
+                LOGGER.error("Error deserializing cached poster data for: {}", movieTitle, e);
+                // Continue to fetch from API if cache deserialization fails
+            }
+        }
+
+        LOGGER.debug("Cache MISS for movie: {} ({})", movieTitle, year);
 
         try {
             // Rate limiting to respect TMDB API limits
@@ -78,14 +97,14 @@ public class MoviePosterUtil {
             // Build search URL
             StringBuilder urlBuilder = new StringBuilder(TMDB_SEARCH_URL);
             urlBuilder.append("?api_key=").append(TMDB_API_KEY);
-            urlBuilder.append("&query=").append(URLEncoder.encode(cleanTitle, "UTF-8"));
+            urlBuilder.append("&query=").append(URLEncoder.encode(cleanTitle, java.nio.charset.StandardCharsets.UTF_8));
 
             if (year != null && year > 1800 && year < 2100) {
                 urlBuilder.append("&year=").append(year);
             }
 
             String searchUrl = urlBuilder.toString();
-            LOGGER.fine("Searching TMDB: " + cleanTitle + (year != null ? " (" + year + ")" : ""));
+            LOGGER.debug("Searching TMDB: {} ({})", cleanTitle, year);
 
             // Make HTTP request with proper timeout and headers
             HttpURLConnection connection = createConnection(searchUrl);
@@ -93,26 +112,40 @@ public class MoviePosterUtil {
 
             if (responseCode == 200) {
                 String responseBody = readResponse(connection);
-                return parseSearchResponse(responseBody, movieTitle, year);
+                MoviePosterResult result = parseSearchResponse(responseBody, movieTitle, year);
+
+                // Cache the result in Redis
+                if (result != null) {
+                    try {
+                        String jsonData = serializeToJson(result);
+                        RedisUtil.set(cacheKey, jsonData, RedisUtil.POSTER_TTL);
+                        LOGGER.debug("Cached poster data for: {}", movieTitle);
+                    } catch (Exception e) {
+                        LOGGER.error("Error caching poster data for: {}", movieTitle, e);
+                        // Continue even if caching fails
+                    }
+                }
+
+                return result;
 
             } else if (responseCode == 401) {
-                LOGGER.severe("TMDB API authentication failed - check your API key");
+                LOGGER.error("TMDB API authentication failed - check your API key");
                 return null;
 
             } else if (responseCode == 429) {
-                LOGGER.warning("TMDB API rate limit exceeded - waiting before retry");
+                LOGGER.warn("TMDB API rate limit exceeded - waiting before retry");
                 // Could implement exponential backoff here
                 return null;
 
             } else {
-                LOGGER.warning("TMDB API request failed with code: " + responseCode);
+                LOGGER.warn("TMDB API request failed with code: {}", responseCode);
                 return null;
             }
 
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "IO error fetching movie poster from TMDB for: " + movieTitle, e);
+            LOGGER.warn("IO error fetching movie poster from TMDB for: {}", movieTitle, e);
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Unexpected error in movie poster search for: " + movieTitle, e);
+            LOGGER.warn("Unexpected error in movie poster search for: {}", movieTitle, e);
         }
 
         return null;
@@ -163,7 +196,7 @@ public class MoviePosterUtil {
 
     private static String readResponse(HttpURLConnection connection) throws IOException {
         try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(connection.getInputStream(), "UTF-8"))) {
+                new InputStreamReader(connection.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
 
             StringBuilder response = new StringBuilder();
             String line;
@@ -179,8 +212,8 @@ public class MoviePosterUtil {
             JSONObject jsonResponse = new JSONObject(responseBody);
             JSONArray results = jsonResponse.getJSONArray("results");
 
-            if (results.length() == 0) {
-                LOGGER.fine("No TMDB results found for: " + originalTitle);
+            if (results.isEmpty()) {
+                LOGGER.debug("No TMDB results found for: {}", originalTitle);
                 return null;
             }
 
@@ -195,14 +228,14 @@ public class MoviePosterUtil {
                     String trailerUrl = fetchTrailerUrl(result.getTmdbId());
                     result.setTrailerUrl(trailerUrl);
                 }
-                
-                LOGGER.fine("Found poster for: " + originalTitle + " -> " +
+
+                LOGGER.debug("Found poster for: {} -> {}", originalTitle,
                         (result.getPosterUrl() != null ? "Success" : "No poster URL"));
                 return result;
             }
 
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error parsing TMDB response for: " + originalTitle, e);
+            LOGGER.warn("Error parsing TMDB response for: {}", originalTitle, e);
         }
 
         return null;
@@ -236,7 +269,7 @@ public class MoviePosterUtil {
                 }
             }
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error fetching trailer for TMDB ID: " + tmdbId, e);
+            LOGGER.warn("Error fetching trailer for TMDB ID: {}", tmdbId, e);
         }
         return null;
     }
@@ -302,8 +335,39 @@ public class MoviePosterUtil {
             }
 
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error parsing TMDB movie result", e);
+            LOGGER.warn("Error parsing TMDB movie result", e);
         }
+
+        return result;
+    }
+
+    /**
+     * Serialize MoviePosterResult to JSON string for Redis caching
+     */
+    private static String serializeToJson(MoviePosterResult result) {
+        JSONObject json = new JSONObject();
+        json.put("posterUrl", result.getPosterUrl());
+        json.put("backdropUrl", result.getBackdropUrl());
+        json.put("trailerUrl", result.getTrailerUrl());
+        json.put("overview", result.getOverview());
+        json.put("rating", result.getRating());
+        json.put("tmdbId", result.getTmdbId());
+        return json.toString();
+    }
+
+    /**
+     * Deserialize JSON string to MoviePosterResult from Redis cache
+     */
+    private static MoviePosterResult deserializeFromJson(String jsonString) {
+        JSONObject json = new JSONObject(jsonString);
+        MoviePosterResult result = new MoviePosterResult();
+
+        if (json.has("posterUrl")) result.setPosterUrl(json.optString("posterUrl", null));
+        if (json.has("backdropUrl")) result.setBackdropUrl(json.optString("backdropUrl", null));
+        if (json.has("trailerUrl")) result.setTrailerUrl(json.optString("trailerUrl", null));
+        if (json.has("overview")) result.setOverview(json.optString("overview", null));
+        if (json.has("rating")) result.setRating(json.optDouble("rating", 0.0));
+        if (json.has("tmdbId")) result.setTmdbId(json.optInt("tmdbId", 0));
 
         return result;
     }
@@ -337,7 +401,7 @@ public class MoviePosterUtil {
             MoviePosterResult result = searchMoviePoster("The Matrix", 1999);
             return result != null;
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "API connection test failed", e);
+            LOGGER.warn("API connection test failed", e);
             return false;
         }
     }

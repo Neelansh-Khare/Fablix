@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context path="/fabflix">
+    <!--
+    Redis Session Manager using Redisson
+
+    To enable Redis session management, uncomment the Manager element below.
+    This allows session sharing across multiple Tomcat instances for horizontal scaling.
+
+    Requirements:
+    1. Redis must be running (see REDIS_SETUP.md)
+    2. redisson-tomcat-9 dependency in pom.xml
+    3. redisson.yaml configuration file in src/main/resources
+
+    Note: For development, this is optional. Sessions will work fine without Redis.
+    For production with multiple instances, enable this for session persistence.
+    -->
+
+    <!--
+    <Manager className="org.redisson.tomcat.RedissonSessionManager"
+             configPath="${catalina.base}/webapps/fabflix/WEB-INF/classes/redisson.yaml"
+             readMode="REDIS"
+             updateMode="DEFAULT"
+             broadcastSessionEvents="false"/>
+    -->
+
+    <!--
+    Alternative: If you want to enable it via environment variable
+    Set REDIS_SESSION_ENABLED=true to enable Redis session management
+    -->
+</Context>

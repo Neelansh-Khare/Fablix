@@ -22,7 +22,6 @@ target/
 .sts4-cache
 
 # Maven
-target/
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
@@ -41,10 +40,22 @@ build/
 
 ### VS Code ###
 .vscode/
-
+.idea/
+.claude/
 ### Mac OS ###
 .DS_Store
 
 # AWS
 .aws/
+
+# Configuration files with sensitive data
 src/main/resources/config.properties
+src/main/resources/db.properties
+
+# IntelliJ IDEA workspace files (already covered by .idea/ but being explicit)
+.idea/workspace.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/dataSources.xml
+.idea/dataSources.local.xml
+.idea/data_source_mapping.xml

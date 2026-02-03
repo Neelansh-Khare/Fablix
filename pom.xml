@@ -112,6 +112,20 @@
       <artifactId>jbcrypt</artifactId>
       <version>0.4</version>
     </dependency>
+
+    <!-- Redis Client (Jedis) -->
+    <dependency>
+      <groupId>redis.clients</groupId>
+      <artifactId>jedis</artifactId>
+      <version>5.1.0</version>
+    </dependency>
+
+    <!-- Redis Session Management -->
+    <dependency>
+      <groupId>org.redisson</groupId>
+      <artifactId>redisson-tomcat-9</artifactId>
+      <version>3.25.2</version>
+    </dependency>
   </dependencies>
 
   <build>

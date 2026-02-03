@@ -1,0 +1,35 @@
+---
+# Redisson configuration for Redis session management
+singleServerConfig:
+  # Redis server address
+  address: "redis://127.0.0.1:6379"
+  # Connection timeout (ms)
+  connectTimeout: 10000
+  # Command timeout (ms)
+  timeout: 3000
+  # Retry attempts
+  retryAttempts: 3
+  # Retry interval (ms)
+  retryInterval: 1500
+  # Database number
+  database: 0
+  # Password (optional - uncomment and set if needed)
+  # password: "your-redis-password"
+  # Connection pool size
+  connectionPoolSize: 50
+  connectionMinimumIdleSize: 10
+  # Idle connection timeout (ms)
+  idleConnectionTimeout: 10000
+  # DNS monitoring interval (ms)
+  dnsMonitoringInterval: 5000
+
+# Thread pool settings
+threads: 16
+nettyThreads: 32
+
+# Codec for data serialization
+# Using JDK serialization for session compatibility
+codec: !<org.redisson.codec.MarshallingCodec> {}
+
+# Transport mode
+transportMode: "NIO"
