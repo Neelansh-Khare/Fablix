@@ -1,6 +1,6 @@
 # FabFlix - Movie E-Commerce Application
 
-A full-stack movie browsing and purchasing web application built with Java Servlets, JSP, PostgreSQL, and jQuery.
+A full-stack movie browsing and purchasing web application built with Java Servlets, JSP, MySQL/PostgreSQL, and jQuery.
 
 ## Features
 
@@ -15,7 +15,8 @@ A full-stack movie browsing and purchasing web application built with Java Servl
 | Layer | Technology |
 |-------|------------|
 | Backend | Java Servlets, JSP |
-| Database | PostgreSQL with HikariCP connection pooling |
+| Database | PostgreSQL or MySQL with HikariCP connection pooling |
+| Caching | Redis (optional) |
 | Frontend | jQuery, HTML5, CSS3 |
 | Security | BCrypt, Google reCAPTCHA |
 | Logging | SLF4J + Logback |
@@ -27,25 +28,26 @@ A full-stack movie browsing and purchasing web application built with Java Servl
 
 - Java 11+
 - Maven
-- PostgreSQL
+- PostgreSQL (Mac/Linux) or MySQL (Windows)
 - Tomcat 9+
 
-### Database Setup
+> **📖 For detailed setup instructions, see [`docs/NEW_MACHINE_SETUP.md`](docs/NEW_MACHINE_SETUP.md)**
 
+### Quick Setup
+
+**PostgreSQL (Mac/Linux):**
 ```bash
-# 1. Create database
-psql -c "CREATE DATABASE fabflix;"
-
-# 2. Run setup script (creates tables, loads data, fixes sequences, hashes passwords)
+cd sql/
 ./setup_database.sh
-
-# Or manually:
-psql -d fabflix -f createtable.sql
-psql -d fabflix -f movie-data.sql
-psql -d fabflix -f reset_sequences.sql
-java -cp "target/fabflix/WEB-INF/lib/*:target/classes" \
-     com.neelanshkhare.fabflix.util.PasswordMigration
 ```
+
+**MySQL (Windows):**
+```bash
+cd sql/
+./setup_database_mysql.sh
+```
+
+See [`sql/README.md`](sql/README.md) for all SQL scripts and manual setup instructions.
 
 ### Configuration
 
@@ -80,6 +82,20 @@ mvn tomcat7:run
 
 ```
 fabflix/
+├── docs/                   # 📚 All documentation
+│   ├── README.md
+│   ├── NEW_MACHINE_SETUP.md   # ⭐ Start here for setup
+│   ├── WINDOWS_DB_SETUP.md
+│   ├── REDIS_SETUP.md
+│   └── ...
+├── sql/                    # 🗄️ All database scripts
+│   ├── README.md
+│   ├── schema_mysql.sql       # MySQL schema
+│   ├── createtable.sql        # PostgreSQL schema
+│   ├── movie-data.sql         # Dataset (~12MB)
+│   ├── setup_database.sh      # PostgreSQL setup script
+│   ├── setup_database_mysql.sh # MySQL setup script
+│   └── ...
 ├── src/main/java/com/neelanshkhare/fabflix/
 │   ├── dao/impl/          # Data Access Objects
 │   ├── filter/            # Auth filters
@@ -92,22 +108,21 @@ fabflix/
 │   ├── js/                # Frontend JavaScript
 │   ├── WEB-INF/           # Web config
 │   └── index.jsp          # Main entry point
-├── createtable.sql        # Schema definition
-├── movie-data.sql         # Full dataset
-├── sample_data.sql        # Minimal test data
-├── reset_sequences.sql    # Fix PostgreSQL sequences
-└── setup_database.sh      # Complete setup script
+├── docker-compose.yml     # Docker configuration
+└── pom.xml                # Maven dependencies
 ```
 
 ## Database Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `createtable.sql` | Creates all tables with proper constraints |
-| `movie-data.sql` | Full movie dataset (~160k lines) |
-| `sample_data.sql` | Minimal sample data for testing |
-| `reset_sequences.sql` | Resets SERIAL sequences after bulk inserts |
-| `setup_database.sh` | Complete setup: tables + data + sequences + passwords |
+See [`sql/README.md`](sql/README.md) for complete documentation. Quick reference:
+
+| Script | Purpose | Database |
+|--------|---------|----------|
+| `sql/schema_mysql.sql` | **Complete MySQL schema** (recommended) | MySQL |
+| `sql/createtable.sql` | Schema definition | PostgreSQL |
+| `sql/movie-data.sql` | Full movie dataset (~10,000+ movies) | Both |
+| `sql/setup_database.sh` | Automated PostgreSQL setup | PostgreSQL |
+| `sql/setup_database_mysql.sh` | Automated MySQL setup | MySQL |
 
 ## Key Components
 
@@ -129,8 +144,13 @@ java -cp "target/fabflix/WEB-INF/lib/*:target/classes" \
 
 ## Documentation
 
-- [Windows Setup Guide](WINDOWS_DB_SETUP.md)
-- [Development Roadmap](nextStepsV2.md)
+See [`docs/README.md`](docs/README.md) for all documentation. Quick links:
+
+- **[🚀 New Machine Setup](docs/NEW_MACHINE_SETUP.md)** - Complete setup guide for Mac/Windows
+- [Windows DB Setup](docs/WINDOWS_DB_SETUP.md) - Windows-specific MySQL setup
+- [Redis Setup](docs/REDIS_SETUP.md) - Redis caching configuration
+- [Database Schema](docs/database.md) - Database design and architecture
+- [Development Roadmap](docs/nextStepsV2.md) - Future improvements and features
 
 ## License
 

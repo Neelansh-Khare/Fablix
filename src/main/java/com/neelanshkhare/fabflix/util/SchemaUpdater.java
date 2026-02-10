@@ -14,7 +14,7 @@ public class SchemaUpdater {
             Connection conn = DBConnectionUtil.getConnection();
             Statement stmt = conn.createStatement();
 
-            InputStream is = SchemaUpdater.class.getClassLoader().getResourceAsStream("update_schema_auth.sql");
+            InputStream is = SchemaUpdater.class.getClassLoader().getResourceAsStream("sql/update_schema_auth.sql");
             if (is == null) {
                 System.err.println("Could not find update_schema_auth.sql");
                 return;

@@ -1,0 +1,6 @@
+db.driver=com.mysql.cj.jdbc.Driver
+db.url=jdbc:url
+db.username=root
+db.password=password
+db.min_connections=5
+db.max_connections=10
