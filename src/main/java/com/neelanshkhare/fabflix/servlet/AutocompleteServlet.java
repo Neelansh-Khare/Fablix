@@ -4,6 +4,7 @@ import com.neelanshkhare.fabflix.service.MovieService;
 import com.neelanshkhare.fabflix.service.StarService;
 import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.model.Star;
+import com.neelanshkhare.fabflix.util.RedisUtil;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -44,8 +45,15 @@ public class AutocompleteServlet extends HttpServlet {
 
         try {
             String query = request.getParameter("query");
-            int limit = 10; // Default limit
+            if (query == null || query.trim().length() < 2) {
+                // Need at least 2 characters for autocomplete
+                JSONObject result = new JSONObject();
+                result.put("suggestions", new JSONArray());
+                out.print(result.toString());
+                return;
+            }
 
+            int limit = 10; // Default limit
             try {
                 String limitParam = request.getParameter("limit");
                 if (limitParam != null && !limitParam.isEmpty()) {
@@ -56,13 +64,18 @@ public class AutocompleteServlet extends HttpServlet {
                 logger.warn("Invalid limit parameter, using default", e);
             }
 
-            if (query == null || query.trim().length() < 2) {
-                // Need at least 2 characters for autocomplete
-                JSONObject result = new JSONObject();
-                result.put("suggestions", new JSONArray());
-                out.print(result.toString());
+            // Redis Caching Logic
+            String normalizedQuery = query.toLowerCase().trim();
+            String cacheKey = RedisUtil.AUTOCOMPLETE_KEY_PREFIX + normalizedQuery + ":" + limit;
+            
+            String cachedResponse = RedisUtil.get(cacheKey);
+            if (cachedResponse != null) {
+                logger.debug("Autocomplete cache hit for query: '{}', limit: {}", normalizedQuery, limit);
+                out.print(cachedResponse);
                 return;
             }
+
+            logger.debug("Autocomplete cache miss for query: '{}', limit: {}", normalizedQuery, limit);
 
             // Get suggestions from movies and stars
             Set<JSONObject> suggestions = new LinkedHashSet<>(); // Use Set to avoid duplicates
@@ -122,7 +135,13 @@ public class AutocompleteServlet extends HttpServlet {
             JSONObject result = new JSONObject();
             result.put("suggestions", suggestionsArray);
             result.put("query", query);
-            out.print(result.toString());
+            
+            String responseString = result.toString();
+            
+            // Store in Redis
+            RedisUtil.set(cacheKey, responseString, RedisUtil.AUTOCOMPLETE_TTL);
+            
+            out.print(responseString);
 
         } catch (Exception e) {
             logger.error("Error in doGet for AutocompleteServlet", e);

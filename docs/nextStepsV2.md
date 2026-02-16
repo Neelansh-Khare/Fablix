@@ -1,8 +1,9 @@
-# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-01-26
+# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-02-16
 
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
 ## 0. Completed Tasks (Recently Done)
+*   **[x] Autocomplete Caching (2026-02-16):** Implemented Redis-based caching for autocomplete suggestions in `AutocompleteServlet`.
 *   **[x] Database Recovery & Stability (2.1):** PostgreSQL database is operational with HikariCP connection pooling.
 *   **[x] Security - Externalize Secrets (2.2):** `ConfigUtil` now reads from `config.properties` or Environment Variables (TMDB_API_KEY, RECAPTCHA_SECRET).
 *   **[x] Fix Poster Implementation (2.3):** `MoviePosterUtil` implemented with rate limiting, better error handling, and TMDB integration.
@@ -90,8 +91,8 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   Prepared for horizontal scaling (session sharing)
     *   Production-grade connection pooling
 
-### 4.2. Future Redis Enhancements (Not Started)
-*   **Autocomplete Caching:** Cache search autocomplete results in Redis
+### 4.2. Future Redis Enhancements
+*   **[x] Autocomplete Caching:** Cache search autocomplete results in Redis (COMPLETED 2026-02-16)
 *   **Advanced Analytics:** Track cache hit rates and popular searches
 *   **Redis Cluster:** Multi-node Redis for high availability
 
