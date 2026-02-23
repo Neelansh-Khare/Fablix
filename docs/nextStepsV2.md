@@ -3,6 +3,7 @@
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
 ## 0. Completed Tasks (Recently Done)
+*   **[x] Global Exception Handling (2026-02-23):** Implemented dedicated error pages (`error-404.jsp`, `error-500.jsp`) and configured `web.xml` for graceful error handling.
 *   **[x] Autocomplete Caching (2026-02-16):** Implemented Redis-based caching for autocomplete suggestions in `AutocompleteServlet`.
 *   **[x] Database Recovery & Stability (2.1):** PostgreSQL database is operational with HikariCP connection pooling.
 *   **[x] Security - Externalize Secrets (2.2):** `ConfigUtil` now reads from `config.properties` or Environment Variables (TMDB_API_KEY, RECAPTCHA_SECRET).
@@ -104,7 +105,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **[x] Connection Pooling:** Replaced custom `DBConnectionUtil` with **HikariCP**.
 *   **[x] Logging & Error Handling:** Replaced `e.printStackTrace()` with structured logging (SLF4J/Logback).
 *   **HTTPS Implementation:** Configure Tomcat to serve content over HTTPS (Self-signed for local, Certificate for Prod).
-*   **Global Exception Handling:** Implement a `Filter` or custom error pages in `web.xml` to handle 404/500 errors gracefully.
+*   **[x] Global Exception Handling (2026-02-23):** Implement a `Filter` or custom error pages in `web.xml` to handle 404/500 errors gracefully.
 
 ### 5.2. AWS Deployment
 *   **EC2 Deployment:** Deploy to AWS EC2 (Free Tier).
