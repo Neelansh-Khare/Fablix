@@ -46,13 +46,13 @@ Redis connection settings can be configured via environment variables:
 - **TTL:** 7 days
 - **Purpose:** Cache TMDB API responses to reduce API calls and improve performance
 
-### 2. Autocomplete Results (Future)
-- **Key Pattern:** `autocomplete:{query}`
+### 2. Autocomplete Results
+- **Key Pattern:** `autocomplete:{query}:{limit}`
 - **TTL:** 1 day
-- **Purpose:** Cache search autocomplete results
+- **Purpose:** Cache search autocomplete results to reduce database load
 
-### 3. Session Management (Future)
-- **Purpose:** Distributed session storage for horizontal scaling
+### 3. Session Management (Optional)
+- **Purpose:** Distributed session storage for horizontal scaling (configured via Redisson)
 
 ## Monitoring Redis
 

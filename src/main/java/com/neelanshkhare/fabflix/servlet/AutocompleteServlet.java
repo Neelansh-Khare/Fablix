@@ -4,6 +4,7 @@ import com.neelanshkhare.fabflix.service.MovieService;
 import com.neelanshkhare.fabflix.service.StarService;
 import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.model.Star;
+import com.neelanshkhare.fabflix.util.RedisUtil;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -63,6 +64,18 @@ public class AutocompleteServlet extends HttpServlet {
                 out.print(result.toString());
                 return;
             }
+            
+            // Check Redis Cache
+            String cacheKey = RedisUtil.AUTOCOMPLETE_KEY_PREFIX + query.trim() + ":" + limit;
+            String cachedResult = RedisUtil.get(cacheKey);
+            
+            if (cachedResult != null) {
+                logger.debug("Autocomplete cache hit for query: {}", query);
+                out.print(cachedResult);
+                return;
+            }
+            
+            logger.debug("Autocomplete cache miss for query: {}", query);
 
             // Get suggestions from movies and stars
             Set<JSONObject> suggestions = new LinkedHashSet<>(); // Use Set to avoid duplicates
@@ -122,7 +135,13 @@ public class AutocompleteServlet extends HttpServlet {
             JSONObject result = new JSONObject();
             result.put("suggestions", suggestionsArray);
             result.put("query", query);
-            out.print(result.toString());
+            
+            String jsonResult = result.toString();
+            
+            // Store in Redis Cache
+            RedisUtil.set(cacheKey, jsonResult, RedisUtil.AUTOCOMPLETE_TTL);
+            
+            out.print(jsonResult);
 
         } catch (Exception e) {
             logger.error("Error in doGet for AutocompleteServlet", e);

@@ -27,12 +27,12 @@ public class RedisUtil {
     // Cache key prefixes for different data types
     public static final String POSTER_KEY_PREFIX = "movie_poster:";
     public static final String TRAILER_KEY_PREFIX = "movie_trailer:"; // Reserved for future use
-    public static final String AUTOCOMPLETE_KEY_PREFIX = "autocomplete:"; // Reserved for future use
+    public static final String AUTOCOMPLETE_KEY_PREFIX = "autocomplete:";
     public static final String MOVIE_KEY_PREFIX = "movie:"; // Reserved for future use
 
     // Default TTL values (in seconds)
     public static final int POSTER_TTL = 7 * 24 * 60 * 60; // 7 days
-    public static final int AUTOCOMPLETE_TTL = 24 * 60 * 60; // 1 day - Reserved for future use
+    public static final int AUTOCOMPLETE_TTL = 24 * 60 * 60; // 1 day
     public static final int MOVIE_TTL = 60 * 60; // 1 hour - Reserved for future use
 
     static {

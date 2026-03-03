@@ -1,4 +1,4 @@
-# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-01-26
+# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-02-03
 
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
@@ -20,6 +20,10 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   MoviePosterUtil now uses Redis cache-aside pattern (7-day TTL).
     *   Redisson configured for distributed session management (optional).
     *   Docker Compose setup for easy Redis deployment.
+*   **[x] Autocomplete Caching (2026-02-03):**
+    *   `AutocompleteServlet` now uses Redis cache-aside pattern.
+    *   Cache key: `autocomplete:{query}:{limit}` with 1-day TTL.
+    *   Reduces database load for frequent autocomplete requests.
 
 ---
 
@@ -29,7 +33,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **Posters:** Robust TMDB integration with Redis caching and rate limiting.
 *   **Cart/Checkout:** Server-side implementation with `CartServlet`.
 *   **Database:** HikariCP connection pooling enabled.
-*   **Caching:** Redis integrated for poster caching, session management ready.
+*   **Caching:** Redis integrated for poster and autocomplete caching, session management ready.
 
 ---
 
@@ -91,7 +95,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   Production-grade connection pooling
 
 ### 4.2. Future Redis Enhancements (Not Started)
-*   **Autocomplete Caching:** Cache search autocomplete results in Redis
+*   **[x] Autocomplete Caching:** Cache search autocomplete results in Redis
 *   **Advanced Analytics:** Track cache hit rates and popular searches
 *   **Redis Cluster:** Multi-node Redis for high availability
 
