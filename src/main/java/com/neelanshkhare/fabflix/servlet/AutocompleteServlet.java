@@ -20,6 +20,7 @@ import java.io.PrintWriter;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.HashSet;
 
 @WebServlet("/api/autocomplete")
 public class AutocompleteServlet extends HttpServlet {
@@ -45,8 +46,15 @@ public class AutocompleteServlet extends HttpServlet {
 
         try {
             String query = request.getParameter("query");
-            int limit = 10; // Default limit
+            if (query == null || query.trim().length() < 2) {
+                // Need at least 2 characters for autocomplete
+                JSONObject result = new JSONObject();
+                result.put("suggestions", new JSONArray());
+                out.print(result.toString());
+                return;
+            }
 
+            int limit = 10; // Default limit
             try {
                 String limitParam = request.getParameter("limit");
                 if (limitParam != null && !limitParam.isEmpty()) {
@@ -57,33 +65,34 @@ public class AutocompleteServlet extends HttpServlet {
                 logger.warn("Invalid limit parameter, using default", e);
             }
 
-            if (query == null || query.trim().length() < 2) {
-                // Need at least 2 characters for autocomplete
-                JSONObject result = new JSONObject();
-                result.put("suggestions", new JSONArray());
-                out.print(result.toString());
+            // Redis Caching Logic
+            String normalizedQuery = query.toLowerCase().trim();
+            String cacheKey = RedisUtil.AUTOCOMPLETE_KEY_PREFIX + normalizedQuery + ":" + limit;
+            
+            String cachedResponse = null;
+            try {
+                cachedResponse = RedisUtil.get(cacheKey);
+            } catch (Exception e) {
+                logger.warn("Redis cache lookup failed (falling back to DB): {}", e.getMessage());
+            }
+
+            if (cachedResponse != null) {
+                logger.debug("Autocomplete cache hit for query: '{}', limit: {}", normalizedQuery, limit);
+                out.print(cachedResponse);
                 return;
             }
             
-            // Check Redis Cache
-            String cacheKey = RedisUtil.AUTOCOMPLETE_KEY_PREFIX + query.trim() + ":" + limit;
-            String cachedResult = RedisUtil.get(cacheKey);
-            
-            if (cachedResult != null) {
-                logger.debug("Autocomplete cache hit for query: {}", query);
-                out.print(cachedResult);
-                return;
-            }
-            
-            logger.debug("Autocomplete cache miss for query: {}", query);
+            logger.debug("Autocomplete cache miss for query: '{}', limit: {}", normalizedQuery, limit);
 
             // Get suggestions from movies and stars
             Set<JSONObject> suggestions = new LinkedHashSet<>(); // Use Set to avoid duplicates
+            Set<String> seenIds = new HashSet<>(); // Track IDs for robust deduplication
 
             // Search movies by title
             List<Movie> moviesByTitle = movieService.getMoviesByTitle(query);
             for (Movie movie : moviesByTitle) {
                 if (suggestions.size() >= limit) break;
+                if (seenIds.contains(movie.getId())) continue;
 
                 JSONObject suggestion = new JSONObject();
                 suggestion.put("type", "movie");
@@ -92,6 +101,7 @@ public class AutocompleteServlet extends HttpServlet {
                 suggestion.put("subtitle", movie.getYear() + " - Dir. " + movie.getDirector());
                 suggestion.put("value", movie.getTitle());
                 suggestions.add(suggestion);
+                seenIds.add(movie.getId());
             }
 
             // Search movies by director
@@ -99,6 +109,7 @@ public class AutocompleteServlet extends HttpServlet {
                 List<Movie> moviesByDirector = movieService.getMoviesByDirector(query);
                 for (Movie movie : moviesByDirector) {
                     if (suggestions.size() >= limit) break;
+                    if (seenIds.contains(movie.getId())) continue;
 
                     JSONObject suggestion = new JSONObject();
                     suggestion.put("type", "movie");
@@ -107,6 +118,7 @@ public class AutocompleteServlet extends HttpServlet {
                     suggestion.put("subtitle", movie.getYear() + " - Dir. " + movie.getDirector());
                     suggestion.put("value", movie.getTitle());
                     suggestions.add(suggestion);
+                    seenIds.add(movie.getId());
                 }
             }
 
@@ -115,6 +127,7 @@ public class AutocompleteServlet extends HttpServlet {
                 List<Star> starsByName = starService.getStarsByName(query);
                 for (Star star : starsByName) {
                     if (suggestions.size() >= limit) break;
+                    if (seenIds.contains(star.getId())) continue;
 
                     JSONObject suggestion = new JSONObject();
                     suggestion.put("type", "star");
@@ -123,6 +136,7 @@ public class AutocompleteServlet extends HttpServlet {
                     suggestion.put("subtitle", "Actor" + (star.getBirthYear() != null ? " (Born " + star.getBirthYear() + ")" : ""));
                     suggestion.put("value", star.getName());
                     suggestions.add(suggestion);
+                    seenIds.add(star.getId());
                 }
             }
 
@@ -139,7 +153,11 @@ public class AutocompleteServlet extends HttpServlet {
             String jsonResult = result.toString();
             
             // Store in Redis Cache
-            RedisUtil.set(cacheKey, jsonResult, RedisUtil.AUTOCOMPLETE_TTL);
+            try {
+                RedisUtil.set(cacheKey, jsonResult, RedisUtil.AUTOCOMPLETE_TTL);
+            } catch (Exception e) {
+                logger.warn("Redis cache storage failed: {}", e.getMessage());
+            }
             
             out.print(jsonResult);
 
