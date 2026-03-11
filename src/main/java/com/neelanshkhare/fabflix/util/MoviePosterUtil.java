@@ -77,6 +77,7 @@ public class MoviePosterUtil {
                 MoviePosterResult cachedResult = deserializeFromJson(cachedData);
                 if (cachedResult != null) {
                     LOGGER.debug("Cache HIT for movie: {} ({})", movieTitle, year);
+                    RedisUtil.increment("stats:cache:poster:hits");
                     return cachedResult;
                 }
             } catch (Exception e) {
@@ -86,6 +87,7 @@ public class MoviePosterUtil {
         }
 
         LOGGER.debug("Cache MISS for movie: {} ({})", movieTitle, year);
+        RedisUtil.increment("stats:cache:poster:misses");
 
         try {
             // Rate limiting to respect TMDB API limits

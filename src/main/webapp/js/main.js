@@ -1125,3 +1125,111 @@ $('<style>')
         }
     `)
     .appendTo('head');
+
+// Autocomplete Functionality
+function initializeAutocomplete() {
+    const searchInput = $('#search-input');
+    const searchForm = $('#search-form');
+    
+    // Create dropdown element
+    const dropdown = $('<div class="autocomplete-dropdown"></div>');
+    searchForm.append(dropdown);
+    
+    let debounceTimer;
+    let cache = {}; // Client-side cache for immediate response
+    
+    searchInput.on('input', function() {
+        const query = $(this).val().trim();
+        
+        // Clear previous timer
+        clearTimeout(debounceTimer);
+        
+        if (query.length < 3) {
+            dropdown.removeClass('show').empty();
+            return;
+        }
+        
+        // Check client cache first
+        if (cache[query]) {
+            displaySuggestions(cache[query], query);
+            return;
+        }
+        
+        // Debounce API call (300ms delay)
+        debounceTimer = setTimeout(function() {
+            console.log(`Fetching autocomplete suggestions for: ${query}`);
+            
+            $.ajax({
+                url: 'api/autocomplete',
+                method: 'GET',
+                data: { query: query },
+                success: function(response) {
+                    // Cache the result
+                    cache[query] = response.suggestions;
+                    displaySuggestions(response.suggestions, query);
+                },
+                error: function(xhr, status, error) {
+                    console.error('Autocomplete error:', error);
+                }
+            });
+        }, 300);
+    });
+    
+    // Hide dropdown when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#search-form').length) {
+            dropdown.removeClass('show');
+        }
+    });
+    
+    // Handle suggestion selection
+    dropdown.on('click', '.autocomplete-item', function() {
+        const type = $(this).data('type');
+        const id = $(this).data('id');
+        const value = $(this).data('value');
+        
+        if (type === 'movie') {
+            loadMovieDetails(id);
+        } else if (type === 'star') {
+            loadStarDetails(id);
+        }
+        
+        searchInput.val(value);
+        dropdown.removeClass('show');
+    });
+    
+    function displaySuggestions(suggestions, query) {
+        dropdown.empty();
+        
+        if (!suggestions || suggestions.length === 0) {
+            dropdown.removeClass('show');
+            return;
+        }
+        
+        suggestions.forEach(function(item) {
+            const iconClass = item.type === 'movie' ? 'fa-film' : 'fa-user';
+            const itemHtml = `
+                <div class="autocomplete-item" data-type="${item.type}" data-id="${item.id}" data-value="${item.value}">
+                    <div class="suggestion-content">
+                        <div class="suggestion-icon">
+                            <i class="fas ${iconClass}"></i>
+                        </div>
+                        <div class="suggestion-text">
+                            <div class="suggestion-title">${highlightMatch(item.title, query)}</div>
+                            <div class="suggestion-subtitle">${item.subtitle}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            dropdown.append(itemHtml);
+        });
+        
+        dropdown.addClass('show');
+    }
+    
+    function highlightMatch(text, query) {
+        if (!query) return text;
+        const regex = new RegExp(`(${query})`, 'gi');
+        return text.replace(regex, '<span class="suggestion-highlight">$1</span>');
+    }
+}

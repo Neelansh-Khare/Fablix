@@ -8,6 +8,7 @@ import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.time.Duration;
+import java.util.Set;
 
 /**
  * Redis connection and caching utility for FabFlix
@@ -29,6 +30,8 @@ public class RedisUtil {
     public static final String TRAILER_KEY_PREFIX = "movie_trailer:"; // Reserved for future use
     public static final String AUTOCOMPLETE_KEY_PREFIX = "autocomplete:";
     public static final String MOVIE_KEY_PREFIX = "movie:"; // Reserved for future use
+    public static final String POPULAR_SEARCHES_KEY = "stats:popular:searches";
+
 
     // Default TTL values (in seconds)
     public static final int POSTER_TTL = 7 * 24 * 60 * 60; // 7 days
@@ -194,6 +197,38 @@ public class RedisUtil {
             return jedis.incr(key);
         } catch (Exception e) {
             logger.error("Error incrementing key in Redis: {}", key, e);
+            return null;
+        }
+    }
+
+    /**
+     * Increment the score of a member in a sorted set
+     */
+    public static Double zincrby(String key, double score, String member) {
+        if (!isRedisAvailable()) {
+            return null;
+        }
+        try (Jedis jedis = getJedis()) {
+            if (jedis == null) return null;
+            return jedis.zincrby(key, score, member);
+        } catch (Exception e) {
+            logger.error("Error incrementing sorted set member in Redis: {}", key, e);
+            return null;
+        }
+    }
+
+    /**
+     * Get range of members from sorted set (reverse order - highest score first)
+     */
+    public static Set<String> zrevrange(String key, long start, long stop) {
+        if (!isRedisAvailable()) {
+            return null;
+        }
+        try (Jedis jedis = getJedis()) {
+            if (jedis == null) return null;
+            return jedis.zrevrange(key, start, stop);
+        } catch (Exception e) {
+            logger.error("Error getting zrevrange from Redis: {}", key, e);
             return null;
         }
     }

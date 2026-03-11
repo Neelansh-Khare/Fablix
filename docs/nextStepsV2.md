@@ -1,4 +1,4 @@
-# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-02-03
+# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-02-04
 
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
@@ -24,6 +24,11 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   `AutocompleteServlet` now uses Redis cache-aside pattern.
     *   Cache key: `autocomplete:{query}:{limit}` with 1-day TTL.
     *   Reduces database load for frequent autocomplete requests.
+*   **[x] Advanced Analytics (2026-02-04):**
+    *   Tracked poster cache hit/miss rates in `MoviePosterUtil` using Redis counters (`stats:cache:poster:hits`, `stats:cache:poster:misses`).
+    *   Tracked autocomplete cache hit/miss rates in `AutocompleteServlet`.
+    *   Tracked popular search queries in `AutocompleteServlet` using a Redis Sorted Set (`stats:popular:searches`).
+    *   Added an endpoint to retrieve top 10 popular searches (`/api/autocomplete?action=popular`).
 
 ---
 
@@ -34,6 +39,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **Cart/Checkout:** Server-side implementation with `CartServlet`.
 *   **Database:** HikariCP connection pooling enabled.
 *   **Caching:** Redis integrated for poster and autocomplete caching, session management ready.
+*   **Analytics:** Basic tracking of cache performance and popular searches in Redis.
 
 ---
 
@@ -95,9 +101,8 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   Production-grade connection pooling
 
 ### 4.2. Future Redis Enhancements (Not Started)
-*   **[x] Autocomplete Caching:** Cache search autocomplete results in Redis
-*   **Advanced Analytics:** Track cache hit rates and popular searches
-*   **Redis Cluster:** Multi-node Redis for high availability
+*   **[ ] Analytics Dashboard:** Create a simple admin page to display cache hit/miss rates and popular searches from Redis.
+*   **[ ] Redis Cluster:** Multi-node Redis for high availability.
 
 ---
 
@@ -106,12 +111,12 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 ### 5.1. Critical Infrastructure
 *   **[x] Connection Pooling:** Replaced custom `DBConnectionUtil` with **HikariCP**.
 *   **[x] Logging & Error Handling:** Replaced `e.printStackTrace()` with structured logging (SLF4J/Logback).
-*   **HTTPS Implementation:** Configure Tomcat to serve content over HTTPS (Self-signed for local, Certificate for Prod).
-*   **Global Exception Handling:** Implement a `Filter` or custom error pages in `web.xml` to handle 404/500 errors gracefully.
+*   **[ ] HTTPS Implementation:** Configure Tomcat to serve content over HTTPS (Self-signed for local, Certificate for Prod).
+*   **[ ] Global Exception Handling:** Implement a `Filter` or custom error pages in `web.xml` to handle 404/500 errors gracefully.
 
 ### 5.2. AWS Deployment
-*   **EC2 Deployment:** Deploy to AWS EC2 (Free Tier).
-*   **Load Balancing:**
+*   **[ ] EC2 Deployment:** Deploy to AWS EC2 (Free Tier).
+*   **[ ] Load Balancing:**
     *   *Phase A:* Set up **Apache HTTP Server** as a software load balancer/reverse proxy.
     *   *Phase B:* Migrate to **AWS Elastic Load Balancer (ELB)** and Auto Scaling Group (ASG).
 
@@ -120,21 +125,21 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 ## 6. Advanced Database & Scalability (Priority 4)
 
 ### 6.1. Database Optimization
-*   **Stored Procedures:** Move complex logic into PostgreSQL Stored Procedures.
-*   **Full-Text Search:** Optimize `MATCH AGAINST` syntax for movie searching.
-*   **PostgreSQL Replication:** Implement Master-Slave replication.
+*   **[ ] Stored Procedures:** Move complex logic into PostgreSQL Stored Procedures.
+*   **[ ] Full-Text Search:** Optimize `MATCH AGAINST` syntax for movie searching.
+*   **[ ] PostgreSQL Replication:** Implement Master-Slave replication.
 
 ### 6.2. Containerization (Long Term)
-*   **Kubernetes:** Containerize the application (Docker) and deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.
+*   **[ ] Kubernetes:** Containerize the application (Docker) and deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.
 
 ---
 
 ## 7. User Recommendations (Priority 5)
 
 ### 7.1. Simple Recommendation Engine
-*   **Collaborative Filtering (Basic):** Recommend movies based on what similar users have purchased/rated.
-*   **Content-Based Filtering:** Recommend movies based on genres, directors, or stars from the user's purchase history.
-*   **"Users who bought X also bought Y":** Simple co-purchase analysis stored in a recommendations table.
+*   **[ ] Collaborative Filtering (Basic):** Recommend movies based on what similar users have purchased/rated.
+*   **[ ] Content-Based Filtering:** Recommend movies based on genres, directors, or stars from the user's purchase history.
+*   **[ ] "Users who bought X also bought Y":** Simple co-purchase analysis stored in a recommendations table.
 
 ### 7.2. Implementation Steps
 1.  Create `recommendations` table to store precomputed recommendations.
@@ -143,3 +148,23 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 4.  (Optional) Periodic batch job to refresh recommendations.
 
 ---
+
+## 8. Summary of Remaining Tasks
+
+Here is a simplified list of the major features and improvements that are still pending:
+
+*   **Redis Enhancements:**
+    *   Build an Analytics Dashboard to view cache stats and popular searches.
+    *   Set up a Redis Cluster for high availability.
+*   **Production Readiness:**
+    *   Implement HTTPS for secure connections.
+    *   Create global exception handling for 404/500 errors.
+    *   Deploy the application to AWS EC2.
+    *   Configure a load balancer (first Apache, then AWS ELB).
+*   **Database & Scalability:**
+    *   Optimize queries using Stored Procedures and Full-Text Search.
+    *   Implement Master-Slave database replication.
+*   **Containerization:**
+    *   Containerize the application with Docker and orchestrate with Kubernetes.
+*   **User Features:**
+    *   Implement a simple movie recommendation engine.

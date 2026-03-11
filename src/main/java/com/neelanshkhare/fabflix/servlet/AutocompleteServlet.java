@@ -45,6 +45,12 @@ public class AutocompleteServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
 
         try {
+            String action = request.getParameter("action");
+            if ("popular".equals(action)) {
+                handlePopularSearches(out);
+                return;
+            }
+
             String query = request.getParameter("query");
             if (query == null || query.trim().length() < 2) {
                 // Need at least 2 characters for autocomplete
@@ -67,6 +73,10 @@ public class AutocompleteServlet extends HttpServlet {
 
             // Redis Caching Logic
             String normalizedQuery = query.toLowerCase().trim();
+            
+            // Track popular searches (regardless of cache hit/miss)
+            RedisUtil.zincrby(RedisUtil.POPULAR_SEARCHES_KEY, 1, normalizedQuery);
+            
             String cacheKey = RedisUtil.AUTOCOMPLETE_KEY_PREFIX + normalizedQuery + ":" + limit;
             
             String cachedResponse = null;
@@ -78,11 +88,13 @@ public class AutocompleteServlet extends HttpServlet {
 
             if (cachedResponse != null) {
                 logger.debug("Autocomplete cache hit for query: '{}', limit: {}", normalizedQuery, limit);
+                RedisUtil.increment("stats:cache:autocomplete:hits");
                 out.print(cachedResponse);
                 return;
             }
             
             logger.debug("Autocomplete cache miss for query: '{}', limit: {}", normalizedQuery, limit);
+            RedisUtil.increment("stats:cache:autocomplete:misses");
 
             // Get suggestions from movies and stars
             Set<JSONObject> suggestions = new LinkedHashSet<>(); // Use Set to avoid duplicates
@@ -168,5 +180,12 @@ public class AutocompleteServlet extends HttpServlet {
             error.put("message", "Error getting autocomplete suggestions: " + e.getMessage());
             out.print(error.toString());
         }
+    }
+
+    private void handlePopularSearches(PrintWriter out) {
+        Set<String> popularSearches = RedisUtil.zrevrange(RedisUtil.POPULAR_SEARCHES_KEY, 0, 9);
+        JSONObject result = new JSONObject();
+        result.put("popular_searches", new JSONArray(popularSearches));
+        out.print(result.toString());
     }
 }
