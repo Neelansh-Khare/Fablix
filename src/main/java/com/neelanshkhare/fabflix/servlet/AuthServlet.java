@@ -33,6 +33,9 @@ public class AuthServlet extends HttpServlet {
                 result.put("id", session.getAttribute("customerId"));
                 result.put("name", session.getAttribute("customerName"));
                 result.put("email", session.getAttribute("customerEmail"));
+                if (session.getAttribute("customerRole") != null) {
+                    result.put("role", session.getAttribute("customerRole"));
+                }
             } else {
                 result.put("loggedIn", false);
             }

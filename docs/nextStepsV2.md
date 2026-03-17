@@ -29,6 +29,11 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   Tracked autocomplete cache hit/miss rates in `AutocompleteServlet`.
     *   Tracked popular search queries in `AutocompleteServlet` using a Redis Sorted Set (`stats:popular:searches`).
     *   Added an endpoint to retrieve top 10 popular searches (`/api/autocomplete?action=popular`).
+*   **[x] Analytics Dashboard (2026-02-04):**
+    *   Created `AdminAnalyticsServlet` to serve metrics.
+    *   Created `_dashboard.jsp` as a simple frontend UI.
+    *   Updated `AdminFilter` to secure the new dashboard.
+    *   Modified `AuthServlet` to return user role, and dynamically show the Dashboard link to admins in `main.js`.
 
 ---
 
@@ -39,7 +44,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **Cart/Checkout:** Server-side implementation with `CartServlet`.
 *   **Database:** HikariCP connection pooling enabled.
 *   **Caching:** Redis integrated for poster and autocomplete caching, session management ready.
-*   **Analytics:** Basic tracking of cache performance and popular searches in Redis.
+*   **Analytics:** Basic tracking of cache performance and popular searches in Redis, viewable via the Admin Dashboard.
 
 ---
 
@@ -101,7 +106,6 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   Production-grade connection pooling
 
 ### 4.2. Future Redis Enhancements (Not Started)
-*   **[ ] Analytics Dashboard:** Create a simple admin page to display cache hit/miss rates and popular searches from Redis.
 *   **[ ] Redis Cluster:** Multi-node Redis for high availability.
 
 ---
@@ -154,7 +158,6 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 Here is a simplified list of the major features and improvements that are still pending:
 
 *   **Redis Enhancements:**
-    *   Build an Analytics Dashboard to view cache stats and popular searches.
     *   Set up a Redis Cluster for high availability.
 *   **Production Readiness:**
     *   Implement HTTPS for secure connections.

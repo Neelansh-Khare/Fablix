@@ -7,7 +7,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 
-@WebFilter(filterName = "AdminFilter", urlPatterns = {"/api/admin/*", "/_dashboard"})
+@WebFilter(filterName = "AdminFilter", urlPatterns = {"/api/admin/*", "/_dashboard", "/_dashboard.jsp"})
 public class AdminFilter implements Filter {
 
     @Override

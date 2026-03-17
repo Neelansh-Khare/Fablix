@@ -80,10 +80,19 @@ function checkLoginStatus() {
                 if (typeof addPosterAdminLink === 'function') {
                     addPosterAdminLink();
                 }
+
+                // Add Admin Dashboard link if user is an admin
+                if (response.role === 'admin') {
+                    if ($('#admin-dashboard-link').length === 0) {
+                        const adminLinkHtml = `<li><a href="_dashboard.jsp" id="admin-dashboard-link"><i class="fas fa-chart-line"></i> Dashboard</a></li>`;
+                        $('.nav-container ul').prepend(adminLinkHtml);
+                    }
+                }
             } else {
                 // User is not logged in
                 $('#login-section').show();
                 $('#account-section').hide();
+                $('#admin-dashboard-link').parent().remove();
             }
         },
         error: function() {
@@ -264,7 +273,24 @@ function setupEventListeners() {
         const password = $('#password').val();
 
         // Use the enhanced login function from auth.js
-        performLogin(email, password);
+        if (typeof performLogin === 'function') {
+             performLogin(email, password);
+        } else {
+             // Fallback if auth.js is not loaded
+             $.ajax({
+                 url: 'api/auth/login', // Adjust if needed based on your API
+                 method: 'POST',
+                 data: { email: email, password: password },
+                 success: function() {
+                     checkLoginStatus();
+                     $('#login-modal').css('display', 'none');
+                     showSuccessMessage('Login successful!');
+                 },
+                 error: function() {
+                     showErrorMessage('Login failed. Please check your credentials.');
+                 }
+             });
+        }
     });
 
     // Register form submission
@@ -281,14 +307,33 @@ function setupEventListeners() {
         };
 
         // Validate password
-        const passwordValidation = validatePassword(formData.password);
-        if (!passwordValidation.valid) {
-            showErrorMessage(passwordValidation.message);
-            return;
+        if (typeof validatePassword === 'function') {
+            const passwordValidation = validatePassword(formData.password);
+            if (!passwordValidation.valid) {
+                showErrorMessage(passwordValidation.message);
+                return;
+            }
         }
 
         // Use the enhanced registration function from auth.js
-        performRegistration(formData);
+        if (typeof performRegistration === 'function') {
+            performRegistration(formData);
+        } else {
+             // Fallback
+             $.ajax({
+                 url: 'api/auth/register',
+                 method: 'POST',
+                 data: formData,
+                 success: function() {
+                     $('#register-modal').css('display', 'none');
+                     showSuccessMessage('Registration successful! Please log in.');
+                     $('#login-modal').css('display', 'block');
+                 },
+                 error: function() {
+                     showErrorMessage('Registration failed. Please try again.');
+                 }
+             });
+        }
     });
 
     // Logout link
@@ -344,19 +389,21 @@ function setupEventListeners() {
 function setupPasswordValidation() {
     $('#reg-password').on('input', function() {
         const password = $(this).val();
-        const strength = updatePasswordStrength(password);
+        if (typeof updatePasswordStrength === 'function') {
+            const strength = updatePasswordStrength(password);
 
-        // Update strength bar
-        const strengthBar = $('.strength-bar');
-        strengthBar.removeClass('weak medium strong');
-        strengthBar.addClass(strength.strengthClass);
+            // Update strength bar
+            const strengthBar = $('.strength-bar');
+            strengthBar.removeClass('weak medium strong');
+            strengthBar.addClass(strength.strengthClass);
 
-        // Update strength text
-        const strengthText = $('#password-strength-text');
-        strengthText.removeClass('weak medium strong');
-        strengthText.addClass(strength.strengthClass);
-        strengthText.text(strength.strengthLabel);
-
+            // Update strength text
+            const strengthText = $('#password-strength-text');
+            strengthText.removeClass('weak medium strong');
+            strengthText.addClass(strength.strengthClass);
+            strengthText.text(strength.strengthLabel);
+        }
+        
         // Update requirements
         updatePasswordRequirements(password);
     });
