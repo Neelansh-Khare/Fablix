@@ -116,7 +116,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **[x] Connection Pooling:** Replaced custom `DBConnectionUtil` with **HikariCP**.
 *   **[x] Logging & Error Handling:** Replaced `e.printStackTrace()` with structured logging (SLF4J/Logback).
 *   **[ ] HTTPS Implementation:** Configure Tomcat to serve content over HTTPS (Self-signed for local, Certificate for Prod).
-*   **[ ] Global Exception Handling:** Implement a `Filter` or custom error pages in `web.xml` to handle 404/500 errors gracefully.
+*   **[x] Global Exception Handling:** Custom error pages (404, 500) and `java.lang.Throwable` handler implemented in `web.xml`. (2026-03-23)
 
 ### 5.2. AWS Deployment
 *   **[ ] EC2 Deployment:** Deploy to AWS EC2 (Free Tier).
@@ -130,7 +130,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 
 ### 6.1. Database Optimization
 *   **[ ] Stored Procedures:** Move complex logic into PostgreSQL Stored Procedures.
-*   **[ ] Full-Text Search:** Optimize `MATCH AGAINST` syntax for movie searching.
+*   **[x] Full-Text Search:** Optimized movie search using PostgreSQL `to_tsvector` and `plainto_tsquery` with GIN indexes on title and director. (2026-03-23)
 *   **[ ] PostgreSQL Replication:** Implement Master-Slave replication.
 
 ### 6.2. Containerization (Long Term)
@@ -161,11 +161,10 @@ Here is a simplified list of the major features and improvements that are still 
     *   Set up a Redis Cluster for high availability.
 *   **Production Readiness:**
     *   Implement HTTPS for secure connections.
-    *   Create global exception handling for 404/500 errors.
     *   Deploy the application to AWS EC2.
     *   Configure a load balancer (first Apache, then AWS ELB).
 *   **Database & Scalability:**
-    *   Optimize queries using Stored Procedures and Full-Text Search.
+    *   Optimize queries using Stored Procedures.
     *   Implement Master-Slave database replication.
 *   **Containerization:**
     *   Containerize the application with Docker and orchestrate with Kubernetes.

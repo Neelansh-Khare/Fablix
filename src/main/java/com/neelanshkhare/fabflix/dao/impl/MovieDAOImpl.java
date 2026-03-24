@@ -116,18 +116,30 @@ public class MovieDAOImpl implements MovieDAO {
 
     @Override
     public List<Movie> searchMovies(String query) {
+        // Optimized for PostgreSQL Full-Text Search
+        // Using to_tsvector and plainto_tsquery for better multi-word matching and performance
         String sql = "SELECT id, title, year, director, banner_url, trailer_url " +
                 "FROM movies " +
-                "WHERE LOWER(title) LIKE LOWER(?) OR LOWER(director) LIKE LOWER(?) " +
+                "WHERE to_tsvector('english', title || ' ' || director) @@ plainto_tsquery('english', ?) " +
                 "LIMIT 100";
+        
+        // Legacy LIKE-based search (fallback if needed)
+        // String sql = "SELECT id, title, year, director, banner_url, trailer_url " +
+        //         "FROM movies " +
+        //         "WHERE LOWER(title) LIKE LOWER(?) OR LOWER(director) LIKE LOWER(?) " +
+        //         "LIMIT 100";
+        
         List<Movie> movies = new ArrayList<>();
 
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            String searchPattern = "%" + query + "%";
-            stmt.setString(1, searchPattern);
-            stmt.setString(2, searchPattern);
+            stmt.setString(1, query);
+            // If using the legacy query, we would set two parameters
+            // String searchPattern = "%" + query + "%";
+            // stmt.setString(1, searchPattern);
+            // stmt.setString(2, searchPattern);
+            
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     Movie movie = new Movie();
