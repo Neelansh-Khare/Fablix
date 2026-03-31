@@ -15,6 +15,7 @@ public interface MovieDAO {
     List<Movie> getMoviesWithoutPosters(int limit);
     int countMovies();
     boolean insert(Movie movie);
+    String addMovieWithProcedure(String title, int year, String director, String starName, String genreName);
     boolean update(Movie movie);
     boolean delete(String id);
 }

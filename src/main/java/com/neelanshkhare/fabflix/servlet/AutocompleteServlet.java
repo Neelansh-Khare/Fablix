@@ -183,9 +183,9 @@ public class AutocompleteServlet extends HttpServlet {
     }
 
     private void handlePopularSearches(PrintWriter out) {
-        Set<String> popularSearches = RedisUtil.zrevrange(RedisUtil.POPULAR_SEARCHES_KEY, 0, 9);
+        List<String> popularSearches = RedisUtil.zrevrange(RedisUtil.POPULAR_SEARCHES_KEY, 0, 9);
         JSONObject result = new JSONObject();
-        result.put("popular_searches", new JSONArray(popularSearches));
+        result.put("popular_searches", popularSearches != null ? new JSONArray(popularSearches) : new JSONArray());
         out.print(result.toString());
     }
 }

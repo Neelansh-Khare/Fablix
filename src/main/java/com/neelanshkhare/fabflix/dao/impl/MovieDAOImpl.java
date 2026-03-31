@@ -281,6 +281,32 @@ public class MovieDAOImpl implements MovieDAO {
         return success;
     }
 
+    @Override
+    public String addMovieWithProcedure(String title, int year, String director, String starName, String genreName) {
+        String sql = "CALL add_movie(?, ?, ?, ?, ?, ?)";
+        String message = "Error: Procedure failed to execute";
+
+        try (Connection conn = DBConnectionUtil.getConnection();
+             CallableStatement stmt = conn.prepareCall(sql)) {
+            
+            stmt.setString(1, title);
+            stmt.setInt(2, year);
+            stmt.setString(3, director);
+            stmt.setString(4, starName);
+            stmt.setString(5, genreName);
+            stmt.registerOutParameter(6, Types.VARCHAR);
+
+            stmt.execute();
+            message = stmt.getString(6);
+            
+        } catch (SQLException e) {
+            logger.error("Error calling add_movie procedure: {}", title, e);
+            message = "Database Error: " + e.getMessage();
+        }
+
+        return message;
+    }
+
     private void insertStarsInMovie(Connection conn, Movie movie) throws SQLException {
         String sql = "INSERT INTO stars_in_movies (star_id, movie_id) VALUES (?, ?)";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {

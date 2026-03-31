@@ -183,6 +183,33 @@ public class StarDAOImpl implements StarDAO {
         return success;
     }
 
+    @Override
+    public String addStarWithProcedure(String name, Integer birthYear) {
+        String sql = "CALL add_star(?, ?, ?)";
+        String message = "Error: Procedure failed to execute";
+
+        try (Connection conn = DBConnectionUtil.getConnection();
+             CallableStatement stmt = conn.prepareCall(sql)) {
+            
+            stmt.setString(1, name);
+            if (birthYear != null) {
+                stmt.setInt(2, birthYear);
+            } else {
+                stmt.setNull(2, Types.INTEGER);
+            }
+            stmt.registerOutParameter(3, Types.VARCHAR);
+
+            stmt.execute();
+            message = stmt.getString(3);
+            
+        } catch (SQLException e) {
+            logger.error("Error calling add_star procedure: {}", name, e);
+            message = "Database Error: " + e.getMessage();
+        }
+
+        return message;
+    }
+
     private void insertMoviesForStar(Connection conn, Star star) throws SQLException {
         String sql = "INSERT INTO stars_in_movies (star_id, movie_id) VALUES (?, ?)";
 

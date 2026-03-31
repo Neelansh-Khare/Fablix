@@ -9,6 +9,7 @@ public interface StarDAO {
     List<Star> findByMovie(String movieId);
     List<Star> listStars(int page, int pageSize);
     boolean insert(Star star);
+    String addStarWithProcedure(String name, Integer birthYear);
     boolean update(Star star);
     boolean delete(String id);
 }

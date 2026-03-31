@@ -8,6 +8,7 @@ import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -220,7 +221,7 @@ public class RedisUtil {
     /**
      * Get range of members from sorted set (reverse order - highest score first)
      */
-    public static Set<String> zrevrange(String key, long start, long stop) {
+    public static List<String> zrevrange(String key, long start, long stop) {
         if (!isRedisAvailable()) {
             return null;
         }

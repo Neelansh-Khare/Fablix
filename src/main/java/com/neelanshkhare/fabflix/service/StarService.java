@@ -29,6 +29,10 @@ public class StarService {
         return starDAO.listStars(page, pageSize);
     }
 
+    public String addStarWithProcedure(String name, Integer birthYear) {
+        return starDAO.addStarWithProcedure(name, birthYear);
+    }
+
     public boolean addStar(Star star) {
         return starDAO.insert(star);
     }

@@ -79,6 +79,60 @@
             align-items: center;
             margin-bottom: 20px;
         }
+        .admin-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 20px;
+            margin-bottom: 2rem;
+        }
+        .action-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn-submit {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn-submit:hover {
+            background: #27ae60;
+        }
+        .message-box {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .message-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
     </style>
 </head>
 <body>
@@ -126,6 +180,52 @@
                 </div>
             </div>
 
+            <div class="admin-actions">
+                <div class="action-card">
+                    <h3><i class="fas fa-film"></i> Add New Movie</h3>
+                    <form id="add-movie-form">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" name="title" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Year</label>
+                            <input type="number" name="year" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Director</label>
+                            <input type="text" name="director" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Star Name</label>
+                            <input type="text" name="starName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Genre Name</label>
+                            <input type="text" name="genreName" required>
+                        </div>
+                        <button type="submit" class="btn-submit">Add Movie (Procedure)</button>
+                    </form>
+                    <div id="movie-message" class="message-box"></div>
+                </div>
+
+                <div class="action-card">
+                    <h3><i class="fas fa-user-plus"></i> Add New Star</h3>
+                    <form id="add-star-form">
+                        <div class="form-group">
+                            <label>Star Name</label>
+                            <input type="text" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Birth Year (Optional)</label>
+                            <input type="number" name="birthYear">
+                        </div>
+                        <button type="submit" class="btn-submit">Add Star (Procedure)</button>
+                    </form>
+                    <div id="star-message" class="message-box"></div>
+                </div>
+            </div>
+
             <div class="popular-searches">
                 <h3>Top 10 Popular Searches</h3>
                 <div id="popular-searches-list">
@@ -140,6 +240,50 @@
 <script>
     $(document).ready(function() {
         loadAnalytics();
+
+        $('#add-movie-form').submit(function(e) {
+            e.preventDefault();
+            const formData = $(this).serialize() + '&action=addMovie';
+            const msgBox = $('#movie-message');
+            
+            $.ajax({
+                url: 'api/admin/movie',
+                method: 'POST',
+                data: formData,
+                success: function(response) {
+                    msgBox.text(response.message).removeClass('message-error').addClass('message-success').show();
+                    if (response.status === 'success') {
+                        $('#add-movie-form')[0].reset();
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error';
+                    msgBox.text(error).removeClass('message-success').addClass('message-error').show();
+                }
+            });
+        });
+
+        $('#add-star-form').submit(function(e) {
+            e.preventDefault();
+            const formData = $(this).serialize() + '&action=addStar';
+            const msgBox = $('#star-message');
+
+            $.ajax({
+                url: 'api/admin/movie',
+                method: 'POST',
+                data: formData,
+                success: function(response) {
+                    msgBox.text(response.message).removeClass('message-error').addClass('message-success').show();
+                    if (response.status === 'success') {
+                        $('#add-star-form')[0].reset();
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON ? xhr.responseJSON.message : 'Unknown error';
+                    msgBox.text(error).removeClass('message-success').addClass('message-error').show();
+                }
+            });
+        });
     });
 
     function loadAnalytics() {

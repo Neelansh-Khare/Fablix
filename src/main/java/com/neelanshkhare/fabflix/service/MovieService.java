@@ -88,6 +88,10 @@ public class MovieService {
         return movieDAO.countMovies();
     }
 
+    public String addMovieWithProcedure(String title, int year, String director, String starName, String genreName) {
+        return movieDAO.addMovieWithProcedure(title, year, director, starName, genreName);
+    }
+
     public boolean addMovie(Movie movie) {
         boolean success = movieDAO.insert(movie);
         if (success) {
