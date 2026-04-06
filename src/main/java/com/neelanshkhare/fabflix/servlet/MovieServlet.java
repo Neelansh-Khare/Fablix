@@ -119,6 +119,31 @@ public class MovieServlet extends HttpServlet {
                     }
                     movieObj.put("stars", starsArray);
 
+                    // Add recommendations
+                    JSONArray similarMoviesArray = new JSONArray();
+                    List<Movie> similarMovies = movieService.getSimilarMovies(movieId, 5);
+                    for (Movie simMovie : similarMovies) {
+                        JSONObject simObj = new JSONObject();
+                        simObj.put("id", simMovie.getId());
+                        simObj.put("title", simMovie.getTitle());
+                        simObj.put("year", simMovie.getYear());
+                        simObj.put("bannerUrl", simMovie.getBannerUrl());
+                        similarMoviesArray.put(simObj);
+                    }
+                    movieObj.put("similarMovies", similarMoviesArray);
+
+                    JSONArray coPurchaseArray = new JSONArray();
+                    List<Movie> coPurchaseMovies = movieService.getCoPurchaseRecommendations(movieId, 5);
+                    for (Movie cpMovie : coPurchaseMovies) {
+                        JSONObject cpObj = new JSONObject();
+                        cpObj.put("id", cpMovie.getId());
+                        cpObj.put("title", cpMovie.getTitle());
+                        cpObj.put("year", cpMovie.getYear());
+                        cpObj.put("bannerUrl", cpMovie.getBannerUrl());
+                        coPurchaseArray.put(cpObj);
+                    }
+                    movieObj.put("coPurchaseRecommendations", coPurchaseArray);
+
                     out.print(movieObj.toString());
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);

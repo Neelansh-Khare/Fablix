@@ -282,6 +282,18 @@ public class MovieDAOImpl implements MovieDAO {
     }
 
     @Override
+    public List<Movie> getSimilarMovies(String movieId, int limit) {
+        String sql = "SELECT id, title, year, director, banner_url FROM get_similar_movies(?, ?)";
+        return executeMovieQuery(sql, movieId, limit);
+    }
+
+    @Override
+    public List<Movie> getCoPurchaseRecommendations(String movieId, int limit) {
+        String sql = "SELECT id, title, year, director, banner_url FROM get_co_purchase_recommendations(?, ?)";
+        return executeMovieQuery(sql, movieId, limit);
+    }
+
+    @Override
     public String addMovieWithProcedure(String title, int year, String director, String starName, String genreName) {
         String sql = "CALL add_movie(?, ?, ?, ?, ?, ?)";
         String message = "Error: Procedure failed to execute";
@@ -424,31 +436,47 @@ public class MovieDAOImpl implements MovieDAO {
         return success;
     }
 
-    private List<Movie> executeMovieQuery(String sql, Object param) {
+    private List<Movie> executeMovieQuery(String sql, Object... params) {
         List<Movie> movies = new ArrayList<>();
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            if (param instanceof String) {
-                stmt.setString(1, (String) param);
-            } else if (param instanceof Integer) {
-                stmt.setInt(1, (Integer) param);
+            for (int i = 0; i < params.length; i++) {
+                Object param = params[i];
+                if (param instanceof String) {
+                    stmt.setString(i + 1, (String) param);
+                } else if (param instanceof Integer) {
+                    stmt.setInt(i + 1, (Integer) param);
+                } else if (param == null) {
+                    stmt.setNull(i + 1, Types.NULL);
+                }
             }
 
             try (ResultSet rs = stmt.executeQuery()) {
+                ResultSetMetaData metaData = rs.getMetaData();
+                int columnCount = metaData.getColumnCount();
+                
                 while (rs.next()) {
                     Movie movie = new Movie();
                     movie.setId(rs.getString("id"));
                     movie.setTitle(rs.getString("title"));
                     movie.setYear(rs.getInt("year"));
                     movie.setDirector(rs.getString("director"));
-                    movie.setBannerUrl(rs.getString("banner_url"));
-                    movie.setTrailerUrl(rs.getString("trailer_url"));
+                    
+                    // Only set banner_url and trailer_url if they exist in the result set
+                    for (int i = 1; i <= columnCount; i++) {
+                        String columnName = metaData.getColumnName(i).toLowerCase();
+                        if ("banner_url".equals(columnName)) {
+                            movie.setBannerUrl(rs.getString(i));
+                        } else if ("trailer_url".equals(columnName)) {
+                            movie.setTrailerUrl(rs.getString(i));
+                        }
+                    }
                     movies.add(movie);
                 }
             }
         } catch (SQLException e) {
-            logger.error("Error executing movie query with param: {}", param, e);
+            logger.error("Error executing movie query with params: {}", params, e);
         }
         return movies;
     }

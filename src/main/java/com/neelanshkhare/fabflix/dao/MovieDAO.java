@@ -13,6 +13,8 @@ public interface MovieDAO {
     List<Movie> searchMovies(String query);
     List<Movie> listMovies(int page, int pageSize);
     List<Movie> getMoviesWithoutPosters(int limit);
+    List<Movie> getSimilarMovies(String movieId, int limit);
+    List<Movie> getCoPurchaseRecommendations(String movieId, int limit);
     int countMovies();
     boolean insert(Movie movie);
     String addMovieWithProcedure(String title, int year, String director, String starName, String genreName);

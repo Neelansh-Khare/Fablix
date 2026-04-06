@@ -80,6 +80,18 @@ public class MovieService {
         return movies;
     }
 
+    public List<Movie> getSimilarMovies(String movieId, int limit) {
+        List<Movie> movies = movieDAO.getSimilarMovies(movieId, limit);
+        fetchPostersForMovieList(movies);
+        return movies;
+    }
+
+    public List<Movie> getCoPurchaseRecommendations(String movieId, int limit) {
+        List<Movie> movies = movieDAO.getCoPurchaseRecommendations(movieId, limit);
+        fetchPostersForMovieList(movies);
+        return movies;
+    }
+
     public List<Movie> getMoviesWithoutPosters(int limit) {
         return movieDAO.getMoviesWithoutPosters(limit);
     }

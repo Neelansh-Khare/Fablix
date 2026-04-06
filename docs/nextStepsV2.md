@@ -1,4 +1,4 @@
-# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-02-04
+# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-04-06
 
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
@@ -34,6 +34,9 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   Created `_dashboard.jsp` as a simple frontend UI.
     *   Updated `AdminFilter` to secure the new dashboard.
     *   Modified `AuthServlet` to return user role, and dynamically show the Dashboard link to admins in `main.js`.
+*   **[x] Recommendation Engine Phase 1 (2026-04-06):**
+    *   Created `sql/get_recommendations.sql` with stored functions for similar movies and co-purchase recommendations.
+    *   Integrated recommendations into `MovieDAO`, `MovieService`, and `MovieServlet`.
 
 ---
 
@@ -45,6 +48,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **Database:** HikariCP connection pooling enabled.
 *   **Caching:** Redis integrated for poster and autocomplete caching, session management ready.
 *   **Analytics:** Basic tracking of cache performance and popular searches in Redis, viewable via the Admin Dashboard.
+*   **Recommendations:** Basic content-based and collaborative filtering implemented via stored functions.
 
 ---
 
@@ -131,6 +135,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 ### 6.1. Database Optimization
 *   **[ ] Stored Procedures:** Move complex logic into PostgreSQL Stored Procedures.
 *   **[x] Full-Text Search:** Optimized movie search using PostgreSQL `to_tsvector` and `plainto_tsquery` with GIN indexes on title and director. (2026-03-23)
+*   **[x] Recommendation Functions:** Implemented `get_similar_movies` and `get_co_purchase_recommendations` stored functions. (2026-04-06)
 *   **[ ] PostgreSQL Replication:** Implement Master-Slave replication.
 
 ### 6.2. Containerization (Long Term)
@@ -140,16 +145,17 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 
 ## 7. User Recommendations (Priority 5)
 
-### 7.1. Simple Recommendation Engine
-*   **[ ] Collaborative Filtering (Basic):** Recommend movies based on what similar users have purchased/rated.
-*   **[ ] Content-Based Filtering:** Recommend movies based on genres, directors, or stars from the user's purchase history.
-*   **[ ] "Users who bought X also bought Y":** Simple co-purchase analysis stored in a recommendations table.
+### 7.1. Simple Recommendation Engine - PHASE 1 COMPLETED (2026-04-06)
+*   **[x] Content-Based Filtering:** Recommend movies based on genres. Implemented via `get_similar_movies` stored function.
+*   **[x] Collaborative Filtering (Basic):** Recommend movies based on what similar users have purchased ("Users who bought this also bought"). Implemented via `get_co_purchase_recommendations` stored function.
+*   **[x] Integration:** Movie details API now returns `similarMovies` and `coPurchaseRecommendations`.
 
 ### 7.2. Implementation Steps
-1.  Create `recommendations` table to store precomputed recommendations.
-2.  Implement `RecommendationService` to generate recommendations based on user history.
-3.  Add recommendation display on movie detail pages and user dashboard.
-4.  (Optional) Periodic batch job to refresh recommendations.
+1.  (Done) Create recommendation stored functions.
+2.  (Done) Implement `MovieService` methods to fetch recommendations.
+3.  (Done) Update `MovieServlet` to include recommendations in movie detail response.
+4.  (Pending) Add recommendation display on movie detail pages UI (main.js/movie-detail.jsp).
+5.  (Optional) Periodic batch job to refresh recommendations.
 
 ---
 
@@ -164,9 +170,9 @@ Here is a simplified list of the major features and improvements that are still 
     *   Deploy the application to AWS EC2.
     *   Configure a load balancer (first Apache, then AWS ELB).
 *   **Database & Scalability:**
-    *   Optimize queries using Stored Procedures.
+    *   Optimize remaining complex queries using Stored Procedures.
     *   Implement Master-Slave database replication.
 *   **Containerization:**
     *   Containerize the application with Docker and orchestrate with Kubernetes.
 *   **User Features:**
-    *   Implement a simple movie recommendation engine.
+    *   Add UI for recommendations on the movie detail page.
