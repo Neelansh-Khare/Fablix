@@ -16,26 +16,22 @@ public class DBConnectionUtil {
 
     static {
         try {
-            // Load database properties
-            Properties prop = new Properties();
-            try (InputStream input = DBConnectionUtil.class.getClassLoader().getResourceAsStream("db.properties")) {
-                if (input == null) {
-                    logger.error("Unable to find db.properties");
-                } else {
-                    prop.load(input);
-                }
-            }
+            // Priority: Environment variables (via ConfigUtil) > db.properties
+            String dbDriver = ConfigUtil.getProperty("db.driver", "org.postgresql.Driver");
+            String dbUrl = ConfigUtil.getProperty("db.url", "jdbc:postgresql://localhost:5432/fabflix");
+            String dbUsername = ConfigUtil.getProperty("db.username", "postgres");
+            String dbPassword = ConfigUtil.getProperty("db.password", "password");
+            
+            int minConnections = Integer.parseInt(ConfigUtil.getProperty("db.min_connections", "5"));
+            int maxConnections = Integer.parseInt(ConfigUtil.getProperty("db.max_connections", "10"));
 
             HikariConfig config = new HikariConfig();
-            config.setDriverClassName(prop.getProperty("db.driver"));
-            config.setJdbcUrl(prop.getProperty("db.url"));
-            config.setUsername(prop.getProperty("db.username"));
-            config.setPassword(prop.getProperty("db.password"));
+            config.setDriverClassName(dbDriver);
+            config.setJdbcUrl(dbUrl);
+            config.setUsername(dbUsername);
+            config.setPassword(dbPassword);
 
             // Pool settings
-            int minConnections = Integer.parseInt(prop.getProperty("db.min_connections", "5"));
-            int maxConnections = Integer.parseInt(prop.getProperty("db.max_connections", "10"));
-            
             config.setMinimumIdle(minConnections);
             config.setMaximumPoolSize(maxConnections);
             
@@ -45,7 +41,7 @@ public class DBConnectionUtil {
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
             dataSource = new HikariDataSource(config);
-            logger.info("HikariCP connection pool initialized successfully");
+            logger.info("HikariCP connection pool initialized successfully with url: {}", dbUrl);
         } catch (Exception e) {
             logger.error("Error initializing HikariCP connection pool", e);
         }

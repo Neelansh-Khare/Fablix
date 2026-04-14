@@ -1,4 +1,4 @@
-# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-04-06
+# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-04-13
 
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
@@ -37,6 +37,12 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **[x] Recommendation Engine Phase 1 (2026-04-06):**
     *   Created `sql/get_recommendations.sql` with stored functions for similar movies and co-purchase recommendations.
     *   Integrated recommendations into `MovieDAO`, `MovieService`, and `MovieServlet`.
+*   **[x] UI & DevOps Enhancements (2026-04-13):**
+    *   **Recommendation UI:** Added "Similar Movies" and "Users also bought" sections to the movie details page in `main.js`.
+    *   **Containerization:** Created `Dockerfile` and `docker-compose.yml` for full application stack (App + DB + Redis).
+    *   **Environment Configuration:** Updated `DBConnectionUtil` to support configuration via Environment Variables.
+    *   **HTTPS Support:** Configured Tomcat with self-signed certificate and HTTPS connector in `server.xml`.
+    *   **Database Optimization:** Moved movie detail retrieval logic into `get_movie_details` PostgreSQL stored function.
 
 ---
 
@@ -49,6 +55,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **Caching:** Redis integrated for poster and autocomplete caching, session management ready.
 *   **Analytics:** Basic tracking of cache performance and popular searches in Redis, viewable via the Admin Dashboard.
 *   **Recommendations:** Basic content-based and collaborative filtering implemented via stored functions.
+*   **Deployment:** Docker-ready with HTTPS enabled.
 
 ---
 
@@ -119,7 +126,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 ### 5.1. Critical Infrastructure
 *   **[x] Connection Pooling:** Replaced custom `DBConnectionUtil` with **HikariCP**.
 *   **[x] Logging & Error Handling:** Replaced `e.printStackTrace()` with structured logging (SLF4J/Logback).
-*   **[ ] HTTPS Implementation:** Configure Tomcat to serve content over HTTPS (Self-signed for local, Certificate for Prod).
+*   **[x] HTTPS Implementation:** Configured Tomcat to serve content over HTTPS (Self-signed). (2026-04-13)
 *   **[x] Global Exception Handling:** Custom error pages (404, 500) and `java.lang.Throwable` handler implemented in `web.xml`. (2026-03-23)
 
 ### 5.2. AWS Deployment
@@ -133,13 +140,14 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 ## 6. Advanced Database & Scalability (Priority 4)
 
 ### 6.1. Database Optimization
-*   **[ ] Stored Procedures:** Move complex logic into PostgreSQL Stored Procedures.
+*   **[x] Stored Procedures:** Moved complex movie retrieval logic into `get_movie_details` PostgreSQL Stored Function. (2026-04-13)
 *   **[x] Full-Text Search:** Optimized movie search using PostgreSQL `to_tsvector` and `plainto_tsquery` with GIN indexes on title and director. (2026-03-23)
 *   **[x] Recommendation Functions:** Implemented `get_similar_movies` and `get_co_purchase_recommendations` stored functions. (2026-04-06)
 *   **[ ] PostgreSQL Replication:** Implement Master-Slave replication.
 
 ### 6.2. Containerization (Long Term)
-*   **[ ] Kubernetes:** Containerize the application (Docker) and deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.
+*   **[x] Docker:** Containerized the application stack using `Dockerfile` and `docker-compose.yml`. (2026-04-13)
+*   **[ ] Kubernetes:** Deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.
 
 ---
 
@@ -154,7 +162,7 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 1.  (Done) Create recommendation stored functions.
 2.  (Done) Implement `MovieService` methods to fetch recommendations.
 3.  (Done) Update `MovieServlet` to include recommendations in movie detail response.
-4.  (Pending) Add recommendation display on movie detail pages UI (main.js/movie-detail.jsp).
+4.  (Done) Add recommendation display on movie detail pages UI (main.js/movie-detail.jsp).
 5.  (Optional) Periodic batch job to refresh recommendations.
 
 ---
@@ -166,13 +174,10 @@ Here is a simplified list of the major features and improvements that are still 
 *   **Redis Enhancements:**
     *   Set up a Redis Cluster for high availability.
 *   **Production Readiness:**
-    *   Implement HTTPS for secure connections.
-    *   Deploy the application to AWS EC2.
+    *   Deploy the application stack to AWS EC2 using Docker Compose.
     *   Configure a load balancer (first Apache, then AWS ELB).
 *   **Database & Scalability:**
-    *   Optimize remaining complex queries using Stored Procedures.
+    *   Optimize remaining complex queries (e.g., browsing/searching) using Stored Procedures.
     *   Implement Master-Slave database replication.
 *   **Containerization:**
-    *   Containerize the application with Docker and orchestrate with Kubernetes.
-*   **User Features:**
-    *   Add UI for recommendations on the movie detail page.
+    *   Orchestrate with Kubernetes.

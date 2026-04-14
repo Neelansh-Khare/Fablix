@@ -5,6 +5,8 @@ import com.neelanshkhare.fabflix.model.Genre;
 import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.model.Star;
 import com.neelanshkhare.fabflix.util.DBConnectionUtil;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,15 +21,7 @@ public class MovieDAOImpl implements MovieDAO {
 
     @Override
     public Movie findById(String id) {
-        String sql = "SELECT m.id, m.title, m.year, m.director, m.banner_url, m.trailer_url, " +
-                "s.id as star_id, s.name as star_name, s.birth_year as star_birth_year, s.photo_url as star_photo_url, " +
-                "g.id as genre_id, g.name as genre_name " +
-                "FROM movies m " +
-                "LEFT JOIN stars_in_movies sim ON m.id = sim.movie_id " +
-                "LEFT JOIN stars s ON sim.star_id = s.id " +
-                "LEFT JOIN genres_in_movies gim ON m.id = gim.movie_id " +
-                "LEFT JOIN genres g ON gim.genre_id = g.id " +
-                "WHERE m.id = ?";
+        String sql = "SELECT get_movie_details(?) as details";
         Movie movie = null;
 
         try (Connection conn = DBConnectionUtil.getConnection();
@@ -35,42 +29,48 @@ public class MovieDAOImpl implements MovieDAO {
             
             stmt.setString(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                Map<String, Star> starsMap = new HashMap<>();
-                Map<Integer, Genre> genresMap = new HashMap<>();
-                while (rs.next()) {
-                    if (movie == null) {
+                if (rs.next()) {
+                    String jsonDetails = rs.getString("details");
+                    if (jsonDetails != null) {
+                        JSONObject movieJson = new JSONObject(jsonDetails);
                         movie = new Movie();
-                        movie.setId(rs.getString("id"));
-                        movie.setTitle(rs.getString("title"));
-                        movie.setYear(rs.getInt("year"));
-                        movie.setDirector(rs.getString("director"));
-                        movie.setBannerUrl(rs.getString("banner_url"));
-                        movie.setTrailerUrl(rs.getString("trailer_url"));
-                    }
+                        movie.setId(movieJson.getString("id"));
+                        movie.setTitle(movieJson.getString("title"));
+                        movie.setYear(movieJson.getInt("year"));
+                        movie.setDirector(movieJson.getString("director"));
+                        movie.setBannerUrl(movieJson.optString("bannerUrl", null));
+                        movie.setTrailerUrl(movieJson.optString("trailerUrl", null));
 
-                    String starId = rs.getString("star_id");
-                    if (starId != null && !starsMap.containsKey(starId)) {
-                        Star star = new Star();
-                        star.setId(starId);
-                        star.setName(rs.getString("star_name"));
-                        star.setBirthYear(rs.getObject("star_birth_year") != null ? rs.getInt("star_birth_year") : null);
-                        star.setPhotoUrl(rs.getString("star_photo_url"));
-                        starsMap.put(starId, star);
-                        movie.addStar(star);
-                    }
+                        // Parse genres
+                        if (movieJson.has("genres") && !movieJson.isNull("genres")) {
+                            JSONArray genresArray = movieJson.getJSONArray("genres");
+                            for (int i = 0; i < genresArray.length(); i++) {
+                                JSONObject gJson = genresArray.getJSONObject(i);
+                                Genre genre = new Genre();
+                                genre.setId(gJson.getInt("id"));
+                                genre.setName(gJson.getString("name"));
+                                movie.addGenre(genre);
+                            }
+                        }
 
-                    Integer genreId = rs.getObject("genre_id") != null ? rs.getInt("genre_id") : null;
-                    if (genreId != null && !genresMap.containsKey(genreId)) {
-                        Genre genre = new Genre();
-                        genre.setId(genreId);
-                        genre.setName(rs.getString("genre_name"));
-                        genresMap.put(genreId, genre);
-                        movie.addGenre(genre);
+                        // Parse stars
+                        if (movieJson.has("stars") && !movieJson.isNull("stars")) {
+                            JSONArray starsArray = movieJson.getJSONArray("stars");
+                            for (int i = 0; i < starsArray.length(); i++) {
+                                JSONObject sJson = starsArray.getJSONObject(i);
+                                Star star = new Star();
+                                star.setId(sJson.getString("id"));
+                                star.setName(sJson.getString("name"));
+                                star.setBirthYear(sJson.isNull("birthYear") ? null : sJson.getInt("birthYear"));
+                                star.setPhotoUrl(sJson.optString("photoUrl", null));
+                                movie.addStar(star);
+                            }
+                        }
                     }
                 }
             }
         } catch (SQLException e) {
-            logger.error("Error finding movie by ID: {}", id, e);
+            logger.error("Error finding movie by ID using procedure: {}", id, e);
         }
 
         return movie;

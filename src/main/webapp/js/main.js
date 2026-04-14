@@ -908,6 +908,59 @@ function displayMovieDetails(movie) {
 
     container.append(detailHtml);
 
+    // Add recommendations
+    if ((movie.similarMovies && movie.similarMovies.length > 0) || 
+        (movie.coPurchaseRecommendations && movie.coPurchaseRecommendations.length > 0)) {
+        
+        let recHtml = '<div class="recommendations-section">';
+        
+        if (movie.similarMovies && movie.similarMovies.length > 0) {
+            recHtml += `
+                <div class="recommendation-group">
+                    <h3>Similar Movies</h3>
+                    <div class="recommendation-grid">
+                        ${movie.similarMovies.map(sim => `
+                            <div class="recommendation-card" data-id="${sim.id}">
+                                <img src="${sim.bannerUrl && sim.bannerUrl.startsWith('http') ? sim.bannerUrl : 'images/no-poster.jpg'}" 
+                                     alt="${sim.title}" class="recommendation-poster"
+                                     onerror="this.src='images/no-poster.jpg'">
+                                <div class="recommendation-title" title="${sim.title}">${sim.title}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (movie.coPurchaseRecommendations && movie.coPurchaseRecommendations.length > 0) {
+            recHtml += `
+                <div class="recommendation-group">
+                    <h3>Users also bought</h3>
+                    <div class="recommendation-grid">
+                        ${movie.coPurchaseRecommendations.map(cp => `
+                            <div class="recommendation-card" data-id="${cp.id}">
+                                <img src="${cp.bannerUrl && cp.bannerUrl.startsWith('http') ? cp.bannerUrl : 'images/no-poster.jpg'}" 
+                                     alt="${cp.title}" class="recommendation-poster"
+                                     onerror="this.src='images/no-poster.jpg'">
+                                <div class="recommendation-title" title="${cp.title}">${cp.title}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        recHtml += '</div>';
+        container.append(recHtml);
+        
+        // Add event listeners for recommendation cards
+        $('.recommendation-card').click(function() {
+            const id = $(this).data('id');
+            loadMovieDetails(id);
+            window.scrollTo(0, 0);
+        });
+    }
+
     // Add event listener for star links
     $('.star-link').click(function(e) {
         e.preventDefault();
@@ -1169,6 +1222,50 @@ $('<style>')
                 justify-content: space-between;
                 width: 100%;
             }
+        }
+
+        /* Recommendations Styles */
+        .recommendations-section {
+            margin-top: 40px;
+            border-top: 2px solid #eee;
+            padding-top: 20px;
+        }
+        
+        .recommendation-group {
+            margin-bottom: 30px;
+        }
+        
+        .recommendation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .recommendation-card {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .recommendation-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .recommendation-poster {
+            width: 100%;
+            height: 225px;
+            object-fit: cover;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .recommendation-title {
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-top: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
     `)
     .appendTo('head');
