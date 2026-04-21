@@ -140,10 +140,11 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 ## 6. Advanced Database & Scalability (Priority 4)
 
 ### 6.1. Database Optimization
-*   **[x] Stored Procedures:** Moved complex movie retrieval logic into `get_movie_details` PostgreSQL Stored Function. (2026-04-13)
-*   **[x] Full-Text Search:** Optimized movie search using PostgreSQL `to_tsvector` and `plainto_tsquery` with GIN indexes on title and director. (2026-03-23)
-*   **[x] Recommendation Functions:** Implemented `get_similar_movies` and `get_co_purchase_recommendations` stored functions. (2026-04-06)
+*   **[x] Database Optimization:**
+    *   Moved movie detail retrieval logic into `get_movie_details` PostgreSQL stored function. (2026-04-13)
+    *   Optimized search and browsing queries using `search_movies_optimized` and `count_movies_filtered` stored functions. (2026-04-20)
 *   **[ ] PostgreSQL Replication:** Implement Master-Slave replication.
+
 
 ### 6.2. Containerization (Long Term)
 *   **[x] Docker:** Containerized the application stack using `Dockerfile` and `docker-compose.yml`. (2026-04-13)

@@ -44,6 +44,12 @@ public class MovieService {
         return movies;
     }
 
+    public List<Movie> searchMovies(String query, String title, Integer year, String director, String starName, Integer genreId, String firstLetter, String sortBy, String sortOrder, int page, int pageSize) {
+        List<Movie> movies = movieDAO.searchMovies(query, title, year, director, starName, genreId, firstLetter, sortBy, sortOrder, page, pageSize);
+        fetchPostersForMovieList(movies);
+        return movies;
+    }
+
     public List<Movie> getMoviesByTitle(String title) {
         List<Movie> movies = movieDAO.findByTitle(title);
         fetchPostersForMovieList(movies);
@@ -98,6 +104,10 @@ public class MovieService {
 
     public int getTotalMoviesCount() {
         return movieDAO.countMovies();
+    }
+
+    public int getCountMoviesFiltered(String query, String title, Integer year, String director, String starName, Integer genreId, String firstLetter) {
+        return movieDAO.countMoviesFiltered(query, title, year, director, starName, genreId, firstLetter);
     }
 
     public String addMovieWithProcedure(String title, int year, String director, String starName, String genreName) {

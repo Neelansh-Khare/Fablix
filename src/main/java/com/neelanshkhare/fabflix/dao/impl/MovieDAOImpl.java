@@ -32,40 +32,7 @@ public class MovieDAOImpl implements MovieDAO {
                 if (rs.next()) {
                     String jsonDetails = rs.getString("details");
                     if (jsonDetails != null) {
-                        JSONObject movieJson = new JSONObject(jsonDetails);
-                        movie = new Movie();
-                        movie.setId(movieJson.getString("id"));
-                        movie.setTitle(movieJson.getString("title"));
-                        movie.setYear(movieJson.getInt("year"));
-                        movie.setDirector(movieJson.getString("director"));
-                        movie.setBannerUrl(movieJson.optString("bannerUrl", null));
-                        movie.setTrailerUrl(movieJson.optString("trailerUrl", null));
-
-                        // Parse genres
-                        if (movieJson.has("genres") && !movieJson.isNull("genres")) {
-                            JSONArray genresArray = movieJson.getJSONArray("genres");
-                            for (int i = 0; i < genresArray.length(); i++) {
-                                JSONObject gJson = genresArray.getJSONObject(i);
-                                Genre genre = new Genre();
-                                genre.setId(gJson.getInt("id"));
-                                genre.setName(gJson.getString("name"));
-                                movie.addGenre(genre);
-                            }
-                        }
-
-                        // Parse stars
-                        if (movieJson.has("stars") && !movieJson.isNull("stars")) {
-                            JSONArray starsArray = movieJson.getJSONArray("stars");
-                            for (int i = 0; i < starsArray.length(); i++) {
-                                JSONObject sJson = starsArray.getJSONObject(i);
-                                Star star = new Star();
-                                star.setId(sJson.getString("id"));
-                                star.setName(sJson.getString("name"));
-                                star.setBirthYear(sJson.isNull("birthYear") ? null : sJson.getInt("birthYear"));
-                                star.setPhotoUrl(sJson.optString("photoUrl", null));
-                                movie.addStar(star);
-                            }
-                        }
+                        movie = parseMovieJson(new JSONObject(jsonDetails));
                     }
                 }
             }
@@ -76,36 +43,71 @@ public class MovieDAOImpl implements MovieDAO {
         return movie;
     }
 
+    private Movie parseMovieJson(JSONObject movieJson) {
+        Movie movie = new Movie();
+        movie.setId(movieJson.getString("id"));
+        movie.setTitle(movieJson.getString("title"));
+        movie.setYear(movieJson.getInt("year"));
+        movie.setDirector(movieJson.getString("director"));
+        movie.setBannerUrl(movieJson.optString("bannerUrl", null));
+        movie.setTrailerUrl(movieJson.optString("trailerUrl", null));
+
+        // Parse genres
+        if (movieJson.has("genres") && !movieJson.isNull("genres")) {
+            JSONArray genresArray = movieJson.getJSONArray("genres");
+            for (int i = 0; i < genresArray.length(); i++) {
+                JSONObject gJson = genresArray.getJSONObject(i);
+                Genre genre = new Genre();
+                genre.setId(gJson.getInt("id"));
+                genre.setName(gJson.getString("name"));
+                movie.addGenre(genre);
+            }
+        }
+
+        // Parse stars
+        if (movieJson.has("stars") && !movieJson.isNull("stars")) {
+            JSONArray starsArray = movieJson.getJSONArray("stars");
+            for (int i = 0; i < starsArray.length(); i++) {
+                JSONObject sJson = starsArray.getJSONObject(i);
+                Star star = new Star();
+                star.setId(sJson.getString("id"));
+                star.setName(sJson.getString("name"));
+                star.setBirthYear(sJson.isNull("birthYear") ? null : sJson.getInt("birthYear"));
+                star.setPhotoUrl(sJson.optString("photoUrl", null));
+                movie.addStar(star);
+            }
+        }
+        return movie;
+    }
+
     @Override
     public List<Movie> findByTitle(String title) {
-        String sql = "SELECT id, title, year, director, banner_url, trailer_url FROM movies WHERE title LIKE ? LIMIT 100";
-        return executeMovieQuery(sql, "%" + title + "%");
+        String sql = "SELECT search_movies_optimized(NULL, ?, NULL, NULL, NULL, NULL, 'title', 'ASC', 100, 0) as result";
+        return executeOptimizedMovieQuery(sql, title);
     }
 
     @Override
     public List<Movie> findByDirector(String director) {
-        String sql = "SELECT id, title, year, director, banner_url, trailer_url FROM movies WHERE director LIKE ? LIMIT 100";
-        return executeMovieQuery(sql, "%" + director + "%");
+        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, ?, NULL, NULL, 'title', 'ASC', 100, 0) as result";
+        return executeOptimizedMovieQuery(sql, director);
     }
 
     @Override
     public List<Movie> findByYear(int year) {
-        String sql = "SELECT id, title, year, director, banner_url, trailer_url FROM movies WHERE year = ? LIMIT 100";
-        return executeMovieQuery(sql, year);
+        String sql = "SELECT search_movies_optimized(NULL, NULL, ?, NULL, NULL, NULL, 'title', 'ASC', 100, 0) as result";
+        return executeOptimizedMovieQuery(sql, year);
     }
 
     @Override
     public List<Movie> findByGenre(int genreId) {
-        String sql = "SELECT m.id, m.title, m.year, m.director, m.banner_url, m.trailer_url " +
-                "FROM movies m " +
-                "JOIN genres_in_movies gim ON m.id = gim.movie_id " +
-                "WHERE gim.genre_id = ? " +
-                "LIMIT 100";
-        return executeMovieQuery(sql, genreId);
+        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, NULL, NULL, ?, 'title', 'ASC', 100, 0) as result";
+        return executeOptimizedMovieQuery(sql, genreId);
     }
 
     @Override
     public List<Movie> findByStar(String starId) {
+        // search_movies_optimized uses star name, so we fallback or implement star_id filter in it.
+        // For now, keep as is or update procedure. Let's update procedure to support star_id too.
         String sql = "SELECT m.id, m.title, m.year, m.director, m.banner_url, m.trailer_url " +
                 "FROM movies m " +
                 "JOIN stars_in_movies sim ON m.id = sim.movie_id " +
@@ -116,76 +118,51 @@ public class MovieDAOImpl implements MovieDAO {
 
     @Override
     public List<Movie> searchMovies(String query) {
-        // Optimized for PostgreSQL Full-Text Search
-        // Using to_tsvector and plainto_tsquery for better multi-word matching and performance
-        String sql = "SELECT id, title, year, director, banner_url, trailer_url " +
-                "FROM movies " +
-                "WHERE to_tsvector('english', title || ' ' || director) @@ plainto_tsquery('english', ?) " +
-                "LIMIT 100";
-        
-        // Legacy LIKE-based search (fallback if needed)
-        // String sql = "SELECT id, title, year, director, banner_url, trailer_url " +
-        //         "FROM movies " +
-        //         "WHERE LOWER(title) LIKE LOWER(?) OR LOWER(director) LIKE LOWER(?) " +
-        //         "LIMIT 100";
-        
-        List<Movie> movies = new ArrayList<>();
+        String sql = "SELECT search_movies_optimized(?, NULL, NULL, NULL, NULL, NULL, NULL, 'title', 'ASC', 100, 0) as result";
+        return executeOptimizedMovieQuery(sql, query);
+    }
 
-        try (Connection conn = DBConnectionUtil.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setString(1, query);
-            // If using the legacy query, we would set two parameters
-            // String searchPattern = "%" + query + "%";
-            // stmt.setString(1, searchPattern);
-            // stmt.setString(2, searchPattern);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Movie movie = new Movie();
-                    movie.setId(rs.getString("id"));
-                    movie.setTitle(rs.getString("title"));
-                    movie.setYear(rs.getInt("year"));
-                    movie.setDirector(rs.getString("director"));
-                    movie.setBannerUrl(rs.getString("banner_url"));
-                    movie.setTrailerUrl(rs.getString("trailer_url"));
-                    movies.add(movie);
-                }
-            }
-        } catch (SQLException e) {
-            logger.error("Error searching movies with query: {}", query, e);
-        }
-
-        return movies;
+    @Override
+    public List<Movie> searchMovies(String query, String title, Integer year, String director, String starName, Integer genreId, String firstLetter, String sortBy, String sortOrder, int page, int pageSize) {
+        int offset = (page - 1) * pageSize;
+        String sql = "SELECT search_movies_optimized(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) as result";
+        return executeOptimizedMovieQuery(sql, query, title, year, director, starName, genreId, firstLetter, sortBy, sortOrder, pageSize, offset);
     }
 
     @Override
     public List<Movie> listMovies(int page, int pageSize) {
         int offset = (page - 1) * pageSize;
-        String sql = "SELECT id, title, year, director, banner_url, trailer_url FROM movies LIMIT ? OFFSET ?";
-        List<Movie> movies = new ArrayList<>();
+        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'title', 'ASC', ?, ?) as result";
+        return executeOptimizedMovieQuery(sql, pageSize, offset);
+    }
 
+    private List<Movie> executeOptimizedMovieQuery(String sql, Object... params) {
+        List<Movie> movies = new ArrayList<>();
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
-            stmt.setInt(1, pageSize);
-            stmt.setInt(2, offset);
+            for (int i = 0; i < params.length; i++) {
+                Object param = params[i];
+                if (param instanceof String) {
+                    stmt.setString(i + 1, (String) param);
+                } else if (param instanceof Integer) {
+                    stmt.setInt(i + 1, (Integer) param);
+                } else if (param == null) {
+                    stmt.setNull(i + 1, Types.NULL);
+                }
+            }
+
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Movie movie = new Movie();
-                    movie.setId(rs.getString("id"));
-                    movie.setTitle(rs.getString("title"));
-                    movie.setYear(rs.getInt("year"));
-                    movie.setDirector(rs.getString("director"));
-                    movie.setBannerUrl(rs.getString("banner_url"));
-                    movie.setTrailerUrl(rs.getString("trailer_url"));
-                    movies.add(movie);
+                    String jsonResult = rs.getString("result");
+                    if (jsonResult != null) {
+                        movies.add(parseMovieJson(new JSONObject(jsonResult)));
+                    }
                 }
             }
         } catch (SQLException e) {
-            logger.error("Error listing movies - page: {}, pageSize: {}", page, pageSize, e);
+            logger.error("Error executing optimized movie query", e);
         }
-
         return movies;
     }
 
@@ -234,6 +211,34 @@ public class MovieDAOImpl implements MovieDAO {
             }
         } catch (SQLException e) {
             logger.error("Error counting movies", e);
+        }
+
+        return count;
+    }
+
+    @Override
+    public int countMoviesFiltered(String query, String title, Integer year, String director, String starName, Integer genreId, String firstLetter) {
+        String sql = "SELECT count_movies_filtered(?, ?, ?, ?, ?, ?, ?)";
+        int count = 0;
+
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setString(1, query);
+            stmt.setString(2, title);
+            if (year != null) stmt.setInt(3, year); else stmt.setNull(3, Types.INTEGER);
+            stmt.setString(4, director);
+            stmt.setString(5, starName);
+            if (genreId != null) stmt.setInt(6, genreId); else stmt.setNull(6, Types.INTEGER);
+            stmt.setString(7, firstLetter);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    count = rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error counting filtered movies", e);
         }
 
         return count;

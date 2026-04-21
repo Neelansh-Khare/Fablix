@@ -11,11 +11,13 @@ public interface MovieDAO {
     List<Movie> findByGenre(int genreId);
     List<Movie> findByStar(String starId);
     List<Movie> searchMovies(String query);
+    List<Movie> searchMovies(String query, String title, Integer year, String director, String starName, Integer genreId, String firstLetter, String sortBy, String sortOrder, int page, int pageSize);
     List<Movie> listMovies(int page, int pageSize);
     List<Movie> getMoviesWithoutPosters(int limit);
     List<Movie> getSimilarMovies(String movieId, int limit);
     List<Movie> getCoPurchaseRecommendations(String movieId, int limit);
     int countMovies();
+    int countMoviesFiltered(String query, String title, Integer year, String director, String starName, Integer genreId, String firstLetter);
     boolean insert(Movie movie);
     String addMovieWithProcedure(String title, int year, String director, String starName, String genreName);
     boolean update(Movie movie);

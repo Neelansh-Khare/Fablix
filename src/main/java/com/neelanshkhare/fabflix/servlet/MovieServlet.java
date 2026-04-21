@@ -78,6 +78,27 @@ public class MovieServlet extends HttpServlet {
                     movieObj.put("director", movie.getDirector());
                     movieObj.put("bannerUrl", movie.getBannerUrl());
                     movieObj.put("trailerUrl", movie.getTrailerUrl());
+
+                    // Add genres
+                    JSONArray genresArray = new JSONArray();
+                    for (Genre genre : movie.getGenres()) {
+                        JSONObject genreObj = new JSONObject();
+                        genreObj.put("id", genre.getId());
+                        genreObj.put("name", genre.getName());
+                        genresArray.put(genreObj);
+                    }
+                    movieObj.put("genres", genresArray);
+
+                    // Add stars
+                    JSONArray starsArray = new JSONArray();
+                    for (Star star : movie.getStars()) {
+                        JSONObject starObj = new JSONObject();
+                        starObj.put("id", star.getId());
+                        starObj.put("name", star.getName());
+                        starsArray.put(starObj);
+                    }
+                    movieObj.put("stars", starsArray);
+
                     moviesArray.put(movieObj);
                 }
 

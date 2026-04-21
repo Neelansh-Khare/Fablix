@@ -43,24 +43,31 @@ public class SearchServlet extends HttpServlet {
             String year = request.getParameter("year");
             String genre = request.getParameter("genre");
             String star = request.getParameter("star");
+            String firstLetter = request.getParameter("firstLetter");
+            
+            // Pagination and Sorting
+            String sortBy = request.getParameter("sortBy");
+            if (sortBy == null || sortBy.isEmpty()) sortBy = "title";
+            
+            String sortOrder = request.getParameter("sortOrder");
+            if (sortOrder == null || sortOrder.isEmpty()) sortOrder = "ASC";
+            
+            int page = 1;
+            int pageSize = 10;
+            
+            try {
+                String pageParam = request.getParameter("page");
+                String pageSizeParam = request.getParameter("pageSize");
+                if (pageParam != null && !pageParam.isEmpty()) page = Integer.parseInt(pageParam);
+                if (pageSizeParam != null && !pageSizeParam.isEmpty()) pageSize = Integer.parseInt(pageSizeParam);
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid pagination parameters, using defaults");
+            }
 
-            List<Movie> movies;
-
-            // Determine which search to perform based on parameters
-            if (query != null && !query.isEmpty()) {
-                // Full-text search
-                movies = movieService.searchMovies(query);
-            } else if (title != null && !title.isEmpty()) {
-                // Search by title
-                movies = movieService.getMoviesByTitle(title);
-            } else if (director != null && !director.isEmpty()) {
-                // Search by director
-                movies = movieService.getMoviesByDirector(director);
-            } else if (year != null && !year.isEmpty()) {
+            Integer yearVal = null;
+            if (year != null && !year.isEmpty()) {
                 try {
-                    // Search by year
-                    int yearVal = Integer.parseInt(year);
-                    movies = movieService.getMoviesByYear(yearVal);
+                    yearVal = Integer.parseInt(year);
                 } catch (NumberFormatException e) {
                     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                     JSONObject error = new JSONObject();
@@ -68,29 +75,23 @@ public class SearchServlet extends HttpServlet {
                     out.print(error.toString());
                     return;
                 }
-            } else if (genre != null && !genre.isEmpty()) {
-                try {
-                    // Search by genre ID
-                    int genreId = Integer.parseInt(genre);
-                    movies = movieService.getMoviesByGenre(genreId);
-                } catch (NumberFormatException e) {
-                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    JSONObject error = new JSONObject();
-                    error.put("message", "Invalid genre ID format");
-                    out.print(error.toString());
-                    return;
-                }
-            } else if (star != null && !star.isEmpty()) {
-                // Search by star ID
-                movies = movieService.getMoviesByStar(star);
-            } else {
-                // No search parameters provided
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                JSONObject error = new JSONObject();
-                error.put("message", "No search criteria provided");
-                out.print(error.toString());
-                return;
             }
+
+            Integer genreId = null;
+            if (genre != null && !genre.isEmpty()) {
+                try {
+                    genreId = Integer.parseInt(genre);
+                } catch (NumberFormatException e) {
+                    // Could be genre name if we support it, but DAO expects ID
+                    logger.warn("Invalid genre ID format: {}", genre);
+                }
+            }
+
+            List<Movie> movies = movieService.searchMovies(
+                query, title, yearVal, director, star, genreId, firstLetter, sortBy, sortOrder, page, pageSize
+            );
+
+            int totalCount = movieService.getCountMoviesFiltered(query, title, yearVal, director, star, genreId, firstLetter);
 
             // Create JSON response with search results
             JSONArray moviesArray = new JSONArray();
@@ -103,12 +104,36 @@ public class SearchServlet extends HttpServlet {
                     movieObj.put("director", movie.getDirector());
                     movieObj.put("bannerUrl", movie.getBannerUrl());
                     movieObj.put("trailerUrl", movie.getTrailerUrl());
+
+                    // Add genres
+                    JSONArray genresArray = new JSONArray();
+                    for (com.neelanshkhare.fabflix.model.Genre genreObj : movie.getGenres()) {
+                        JSONObject genreJson = new JSONObject();
+                        genreJson.put("id", genreObj.getId());
+                        genreJson.put("name", genreObj.getName());
+                        genresArray.put(genreJson);
+                    }
+                    movieObj.put("genres", genresArray);
+
+                    // Add stars
+                    JSONArray starsArray = new JSONArray();
+                    for (com.neelanshkhare.fabflix.model.Star starObj : movie.getStars()) {
+                        JSONObject starJson = new JSONObject();
+                        starJson.put("id", starObj.getId());
+                        starJson.put("name", starObj.getName());
+                        starsArray.put(starJson);
+                    }
+                    movieObj.put("stars", starsArray);
+
                     moviesArray.put(movieObj);
                 }
             }
 
             JSONObject result = new JSONObject();
-            result.put("count", movies != null ? movies.size() : 0);
+            result.put("currentPage", page);
+            result.put("pageSize", pageSize);
+            result.put("totalCount", totalCount);
+            result.put("totalPages", (int) Math.ceil((double) totalCount / pageSize));
             result.put("movies", moviesArray);
             out.print(result.toString());
 
