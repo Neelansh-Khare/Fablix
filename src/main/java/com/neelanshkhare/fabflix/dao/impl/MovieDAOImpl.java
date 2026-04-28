@@ -82,57 +82,51 @@ public class MovieDAOImpl implements MovieDAO {
 
     @Override
     public List<Movie> findByTitle(String title) {
-        String sql = "SELECT search_movies_optimized(NULL, ?, NULL, NULL, NULL, NULL, 'title', 'ASC', 100, 0) as result";
+        String sql = "SELECT search_movies_optimized(NULL, ?, NULL, NULL, NULL, NULL, NULL, 'title', 'ASC', 100, 0, NULL) as result";
         return executeOptimizedMovieQuery(sql, title);
     }
 
     @Override
     public List<Movie> findByDirector(String director) {
-        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, ?, NULL, NULL, 'title', 'ASC', 100, 0) as result";
+        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, ?, NULL, NULL, NULL, 'title', 'ASC', 100, 0, NULL) as result";
         return executeOptimizedMovieQuery(sql, director);
     }
 
     @Override
     public List<Movie> findByYear(int year) {
-        String sql = "SELECT search_movies_optimized(NULL, NULL, ?, NULL, NULL, NULL, 'title', 'ASC', 100, 0) as result";
+        String sql = "SELECT search_movies_optimized(NULL, NULL, ?, NULL, NULL, NULL, NULL, 'title', 'ASC', 100, 0, NULL) as result";
         return executeOptimizedMovieQuery(sql, year);
     }
 
     @Override
     public List<Movie> findByGenre(int genreId) {
-        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, NULL, NULL, ?, 'title', 'ASC', 100, 0) as result";
+        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, NULL, NULL, ?, NULL, 'title', 'ASC', 100, 0, NULL) as result";
         return executeOptimizedMovieQuery(sql, genreId);
     }
 
     @Override
     public List<Movie> findByStar(String starId) {
-        // search_movies_optimized uses star name, so we fallback or implement star_id filter in it.
-        // For now, keep as is or update procedure. Let's update procedure to support star_id too.
-        String sql = "SELECT m.id, m.title, m.year, m.director, m.banner_url, m.trailer_url " +
-                "FROM movies m " +
-                "JOIN stars_in_movies sim ON m.id = sim.movie_id " +
-                "WHERE sim.star_id = ? " +
-                "LIMIT 100";
-        return executeMovieQuery(sql, starId);
+        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'title', 'ASC', 100, 0, ?) as result";
+        return executeOptimizedMovieQuery(sql, starId);
     }
 
     @Override
     public List<Movie> searchMovies(String query) {
-        String sql = "SELECT search_movies_optimized(?, NULL, NULL, NULL, NULL, NULL, NULL, 'title', 'ASC', 100, 0) as result";
+        String sql = "SELECT search_movies_optimized(?, NULL, NULL, NULL, NULL, NULL, NULL, 'title', 'ASC', 100, 0, NULL) as result";
         return executeOptimizedMovieQuery(sql, query);
     }
 
     @Override
     public List<Movie> searchMovies(String query, String title, Integer year, String director, String starName, Integer genreId, String firstLetter, String sortBy, String sortOrder, int page, int pageSize) {
         int offset = (page - 1) * pageSize;
-        String sql = "SELECT search_movies_optimized(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) as result";
+        String sql = "SELECT search_movies_optimized(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL) as result";
         return executeOptimizedMovieQuery(sql, query, title, year, director, starName, genreId, firstLetter, sortBy, sortOrder, pageSize, offset);
     }
 
     @Override
     public List<Movie> listMovies(int page, int pageSize) {
         int offset = (page - 1) * pageSize;
-        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'title', 'ASC', ?, ?) as result";
+        String sql = "SELECT search_movies_optimized(NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'title', 'ASC', ?, ?, NULL) as result";
         return executeOptimizedMovieQuery(sql, pageSize, offset);
     }
 
@@ -250,7 +244,7 @@ public class MovieDAOImpl implements MovieDAO {
                 "VALUES (?, ?, ?, ?, ?, ?)";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection()) {
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
             conn.setAutoCommit(false);
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, movie.getId());
@@ -303,7 +297,7 @@ public class MovieDAOImpl implements MovieDAO {
         String sql = "CALL add_movie(?, ?, ?, ?, ?, ?)";
         String message = "Error: Procedure failed to execute";
 
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              CallableStatement stmt = conn.prepareCall(sql)) {
             
             stmt.setString(1, title);
@@ -354,7 +348,7 @@ public class MovieDAOImpl implements MovieDAO {
                 "banner_url = ?, trailer_url = ? WHERE id = ?";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection()) {
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
             conn.setAutoCommit(false);
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, movie.getTitle());
@@ -413,7 +407,7 @@ public class MovieDAOImpl implements MovieDAO {
         String sql = "DELETE FROM movies WHERE id = ?";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection()) {
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
             conn.setAutoCommit(false);
             try {
                 deleteStarsInMovie(conn, id);

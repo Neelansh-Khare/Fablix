@@ -14,7 +14,8 @@ CREATE OR REPLACE FUNCTION search_movies_optimized(
     p_sort_by VARCHAR DEFAULT 'title',
     p_sort_order VARCHAR DEFAULT 'ASC',
     p_limit INTEGER DEFAULT 10,
-    p_offset INTEGER DEFAULT 0
+    p_offset INTEGER DEFAULT 0,
+    p_star_id VARCHAR DEFAULT NULL
 )
 RETURNS SETOF JSONB
 LANGUAGE plpgsql
@@ -43,6 +44,11 @@ BEGIN
                 SELECT 1 FROM stars_in_movies sim 
                 JOIN stars s ON sim.star_id = s.id 
                 WHERE sim.movie_id = m.id AND s.name ILIKE '%' || p_star_name || '%'
+            ))
+            -- Filter by Star ID
+            AND (p_star_id IS NULL OR EXISTS (
+                SELECT 1 FROM stars_in_movies sim 
+                WHERE sim.movie_id = m.id AND sim.star_id = p_star_id
             ))
             -- Filter by Genre ID
             AND (p_genre_id IS NULL OR EXISTS (

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fabflix-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fabflix-db
+  template:
+    metadata:
+      labels:
+        app: fabflix-db
+    spec:
+      containers:
+      - name: db
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: fabflix
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: password
+        ports:
+        - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-service
+spec:
+  selector:
+    app: fabflix-db
+  ports:
+  - port: 5432
+    targetPort: 5432

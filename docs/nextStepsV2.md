@@ -143,7 +143,12 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **[x] Database Optimization:**
     *   Moved movie detail retrieval logic into `get_movie_details` PostgreSQL stored function. (2026-04-13)
     *   Optimized search and browsing queries using `search_movies_optimized` and `count_movies_filtered` stored functions. (2026-04-20)
-*   **[ ] PostgreSQL Replication:** Implement Master-Slave replication.
+    *   Updated `search_movies_optimized` to support `star_id` and refactored `MovieDAOImpl` to use it for all search/browse operations. (2026-04-27)
+*   **[x] Load Balancing:** Set up Apache HTTP Server as a software load balancer in Docker Compose. (2026-04-27)
+*   **[x] Distributed Sessions:** Enabled Redisson session management for horizontal scaling across multiple Tomcat instances. (2026-04-27)
+*   **[x] Read/Write Splitting:** Updated `DBConnectionUtil` and DAOs to support separate write (primary) and read (replica) database pools. (2026-04-27)
+*   **[x] Kubernetes Manifests:** Created initial deployment and service manifests for K8s orchestration. (2026-04-27)
+*   **[ ] PostgreSQL Replication:** Finalize Master-Slave replication configuration (scripts/automated setup).
 
 
 ### 6.2. Containerization (Long Term)

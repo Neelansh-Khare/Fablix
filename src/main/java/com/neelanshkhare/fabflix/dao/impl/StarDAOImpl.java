@@ -148,7 +148,7 @@ public class StarDAOImpl implements StarDAO {
         String sql = "INSERT INTO stars (id, name, birth_year, photo_url) VALUES (?, ?, ?, ?)";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection()) {
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
             conn.setAutoCommit(false);
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, star.getId());
@@ -188,7 +188,7 @@ public class StarDAOImpl implements StarDAO {
         String sql = "CALL add_star(?, ?, ?)";
         String message = "Error: Procedure failed to execute";
 
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              CallableStatement stmt = conn.prepareCall(sql)) {
             
             stmt.setString(1, name);
@@ -228,7 +228,7 @@ public class StarDAOImpl implements StarDAO {
         String sql = "UPDATE stars SET name = ?, birth_year = ?, photo_url = ? WHERE id = ?";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection()) {
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
             conn.setAutoCommit(false);
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, star.getName());
@@ -278,7 +278,7 @@ public class StarDAOImpl implements StarDAO {
         String sql = "DELETE FROM stars WHERE id = ?";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection()) {
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
             conn.setAutoCommit(false);
             try {
                 deleteMoviesForStar(conn, id);

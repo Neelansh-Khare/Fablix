@@ -23,7 +23,7 @@ public class OrderDAOImpl implements OrderDAO {
 
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection()) {
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
             conn.setAutoCommit(false);
             try {
                 // 1. Insert Order

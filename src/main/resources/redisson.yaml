@@ -2,7 +2,7 @@
 # Redisson configuration for Redis session management
 singleServerConfig:
   # Redis server address
-  address: "redis://127.0.0.1:6379"
+  address: "redis://redis:6379"
   # Connection timeout (ms)
   connectTimeout: 10000
   # Command timeout (ms)

@@ -74,7 +74,7 @@ public class CustomerDAOImpl implements CustomerDAO {
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection()) {
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
             // Hash password using BCrypt (salt is embedded)
             String hashedPassword = SecurityUtil.hashPassword(customer.getPassword());
 
@@ -114,7 +114,7 @@ public class CustomerDAOImpl implements CustomerDAO {
         String sql = "UPDATE customers SET first_name = ?, last_name = ?, cc_id = ?, address = ?, email = ? WHERE id = ?";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, customer.getFirstName());
@@ -140,7 +140,7 @@ public class CustomerDAOImpl implements CustomerDAO {
         String sql = "DELETE FROM customers WHERE id = ?";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, id);
@@ -194,7 +194,7 @@ public class CustomerDAOImpl implements CustomerDAO {
 
     private void upgradePassword(int userId, String rawPassword) {
         String sql = "UPDATE customers SET password = ?, salt = NULL WHERE id = ?";
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             String newHash = SecurityUtil.hashPassword(rawPassword);

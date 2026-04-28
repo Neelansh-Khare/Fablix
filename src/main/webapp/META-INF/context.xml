@@ -15,13 +15,11 @@
     For production with multiple instances, enable this for session persistence.
     -->
 
-    <!--
     <Manager className="org.redisson.tomcat.RedissonSessionManager"
              configPath="${catalina.base}/webapps/fabflix/WEB-INF/classes/redisson.yaml"
              readMode="REDIS"
              updateMode="DEFAULT"
              broadcastSessionEvents="false"/>
-    -->
 
     <!--
     Alternative: If you want to enable it via environment variable

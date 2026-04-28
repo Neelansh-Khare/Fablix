@@ -113,7 +113,7 @@ public class GenreDAOImpl implements GenreDAO {
         String sql = "INSERT INTO genres (name) VALUES (?)";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             
             stmt.setString(1, genre.getName());
@@ -139,7 +139,7 @@ public class GenreDAOImpl implements GenreDAO {
         String sql = "UPDATE genres SET name = ? WHERE id = ?";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, genre.getName());
@@ -161,7 +161,7 @@ public class GenreDAOImpl implements GenreDAO {
         String sql = "DELETE FROM genres WHERE id = ?";
         boolean success = false;
 
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, id);

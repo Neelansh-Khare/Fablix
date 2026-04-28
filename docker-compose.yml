@@ -1,17 +1,23 @@
 version: '3.8'
 
 services:
-  db:
+  db-primary:
     image: postgres:15-alpine
-    container_name: fabflix-db
+    container_name: fabflix-db-primary
     environment:
       POSTGRES_DB: fabflix
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+    command: |
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c hot_standby=on
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-primary-data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d
     restart: unless-stopped
     healthcheck:
@@ -19,6 +25,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  db-replica:
+    image: postgres:15-alpine
+    container_name: fabflix-db-replica
+    environment:
+      POSTGRES_DB: fabflix
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      # In a real setup, we'd use pg_basebackup to initialize this
+    command: |
+      postgres
+      -c hot_standby=on
+    ports:
+      - "5433:5432"
+    depends_on:
+      db-primary:
+        condition: service_healthy
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -35,29 +59,60 @@ services:
       timeout: 3s
       retries: 3
 
-  app:
+  app1:
     build: .
-    container_name: fabflix-app
-    ports:
-      - "8080:8080"
+    container_name: fabflix-app1
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       DB_DRIVER: org.postgresql.Driver
-      DB_URL: jdbc:postgresql://db:5432/fabflix
+      DB_URL_WRITE: jdbc:postgresql://db-primary:5432/fabflix
+      DB_URL_READ: jdbc:postgresql://db-replica:5432/fabflix
       DB_USERNAME: postgres
       DB_PASSWORD: password
       TMDB_API_KEY: ${TMDB_API_KEY}
       RECAPTCHA_SECRET: ${RECAPTCHA_SECRET}
     depends_on:
-      db:
+      db-primary:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
 
+  app2:
+    build: .
+    container_name: fabflix-app2
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DB_DRIVER: org.postgresql.Driver
+      DB_URL_WRITE: jdbc:postgresql://db-primary:5432/fabflix
+      DB_URL_READ: jdbc:postgresql://db-replica:5432/fabflix
+      DB_USERNAME: postgres
+      DB_PASSWORD: password
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      RECAPTCHA_SECRET: ${RECAPTCHA_SECRET}
+    depends_on:
+      db-primary:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  lb:
+    image: httpd:2.4-alpine
+    container_name: fabflix-lb
+    ports:
+      - "80:80"
+    volumes:
+      - ./conf/httpd.conf:/usr/local/apache2/conf/httpd.conf
+    depends_on:
+      - app1
+      - app2
+    restart: unless-stopped
+
 volumes:
-  postgres-data:
+  postgres-primary-data:
     driver: local
   redis-data:
     driver: local

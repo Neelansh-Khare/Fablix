@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fabflix-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fabflix-app
+  template:
+    metadata:
+      labels:
+        app: fabflix-app
+    spec:
+      containers:
+      - name: fabflix-app
+        image: fabflix-app:latest # User would build and push this
+        env:
+        - name: DB_URL_WRITE
+          value: jdbc:postgresql://db-service:5432/fabflix
+        - name: DB_URL_READ
+          value: jdbc:postgresql://db-service:5432/fabflix # Simplified for k8s demo
+        - name: DB_USERNAME
+          value: postgres
+        - name: DB_PASSWORD
+          value: password
+        - name: REDIS_HOST
+          value: redis-service
+        - name: REDIS_PORT
+          value: "6379"
+        - name: TMDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: fabflix-secrets
+              key: tmdb-api-key
+        - name: RECAPTCHA_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: fabflix-secrets
+              key: recaptcha-secret
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: fabflix-app
+  ports:
+  - port: 80
+    targetPort: 8080
