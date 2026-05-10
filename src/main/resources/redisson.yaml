@@ -1,8 +1,14 @@
 ---
-# Redisson configuration for Redis session management
-singleServerConfig:
-  # Redis server address
-  address: "redis://redis:6379"
+# Redisson configuration for Redis Cluster session management
+clusterServersConfig:
+  # Cluster node addresses
+  nodeAddresses:
+    - "redis://redis-node-1:6379"
+    - "redis://redis-node-2:6379"
+    - "redis://redis-node-3:6379"
+    - "redis://redis-node-4:6379"
+    - "redis://redis-node-5:6379"
+    - "redis://redis-node-6:6379"
   # Connection timeout (ms)
   connectTimeout: 10000
   # Command timeout (ms)
@@ -11,24 +17,25 @@ singleServerConfig:
   retryAttempts: 3
   # Retry interval (ms)
   retryInterval: 1500
-  # Database number
-  database: 0
   # Password (optional - uncomment and set if needed)
   # password: "your-redis-password"
   # Connection pool size
-  connectionPoolSize: 50
-  connectionMinimumIdleSize: 10
+  slaveConnectionPoolSize: 24
+  masterConnectionPoolSize: 24
+  slaveConnectionMinimumIdleSize: 5
+  masterConnectionMinimumIdleSize: 5
   # Idle connection timeout (ms)
   idleConnectionTimeout: 10000
   # DNS monitoring interval (ms)
   dnsMonitoringInterval: 5000
+  # Scanning interval (ms)
+  scanInterval: 2000
 
 # Thread pool settings
 threads: 16
 nettyThreads: 32
 
 # Codec for data serialization
-# Using JDK serialization for session compatibility
 codec: !<org.redisson.codec.MarshallingCodec> {}
 
 # Transport mode

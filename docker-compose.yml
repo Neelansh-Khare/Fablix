@@ -44,27 +44,86 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  redis:
+  redis-node-1:
     image: redis:7-alpine
-    container_name: fabflix-redis
-    ports:
-      - "6379:6379"
+    container_name: redis-node-1
+    command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+      - ./conf/redis-cluster.conf:/usr/local/etc/redis/redis.conf
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 5
+
+  redis-node-2:
+    image: redis:7-alpine
+    container_name: redis-node-2
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./conf/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+
+  redis-node-3:
+    image: redis:7-alpine
+    container_name: redis-node-3
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./conf/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+
+  redis-node-4:
+    image: redis:7-alpine
+    container_name: redis-node-4
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./conf/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+
+  redis-node-5:
+    image: redis:7-alpine
+    container_name: redis-node-5
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./conf/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+
+  redis-node-6:
+    image: redis:7-alpine
+    container_name: redis-node-6
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./conf/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+
+  redis-cluster-init:
+    image: redis:7-alpine
+    container_name: redis-cluster-init
+    depends_on:
+      redis-node-1:
+        condition: service_healthy
+      redis-node-2:
+        condition: service_started
+      redis-node-3:
+        condition: service_started
+      redis-node-4:
+        condition: service_started
+      redis-node-5:
+        condition: service_started
+      redis-node-6:
+        condition: service_started
+    command: >
+      sh -c "echo 'yes' | redis-cli --cluster create 
+      redis-node-1:6379 redis-node-2:6379 redis-node-3:6379 
+      redis-node-4:6379 redis-node-5:6379 redis-node-6:6379 
+      --cluster-replicas 1"
 
   app1:
     build: .
     container_name: fabflix-app1
     environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_CLUSTER_NODES: redis-node-1:6379,redis-node-2:6379,redis-node-3:6379
       DB_DRIVER: org.postgresql.Driver
       DB_URL_WRITE: jdbc:postgresql://db-primary:5432/fabflix
       DB_URL_READ: jdbc:postgresql://db-replica:5432/fabflix
@@ -75,7 +134,7 @@ services:
     depends_on:
       db-primary:
         condition: service_healthy
-      redis:
+      redis-node-1:
         condition: service_healthy
     restart: unless-stopped
 
@@ -83,8 +142,7 @@ services:
     build: .
     container_name: fabflix-app2
     environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_CLUSTER_NODES: redis-node-1:6379,redis-node-2:6379,redis-node-3:6379
       DB_DRIVER: org.postgresql.Driver
       DB_URL_WRITE: jdbc:postgresql://db-primary:5432/fabflix
       DB_URL_READ: jdbc:postgresql://db-replica:5432/fabflix
@@ -95,7 +153,7 @@ services:
     depends_on:
       db-primary:
         condition: service_healthy
-      redis:
+      redis-node-1:
         condition: service_healthy
     restart: unless-stopped
 

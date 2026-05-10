@@ -2,28 +2,31 @@ package com.neelanshkhare.fabflix.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Redis connection and caching utility for FabFlix
- * Implements connection pooling and provides helper methods for common Redis operations
+ * Implements JedisCluster for high availability and scalability
  */
 public class RedisUtil {
     private static final Logger logger = LoggerFactory.getLogger(RedisUtil.class);
-    private static JedisPool jedisPool;
+    private static JedisCluster jedisCluster;
     private static boolean redisEnabled = true;
 
     // Redis configuration from environment or defaults
-    private static final String REDIS_HOST = System.getenv().getOrDefault("REDIS_HOST", "localhost");
-    private static final int REDIS_PORT = Integer.parseInt(System.getenv().getOrDefault("REDIS_PORT", "6379"));
+    private static final String REDIS_CLUSTER_NODES = System.getenv().getOrDefault("REDIS_CLUSTER_NODES", "localhost:6379");
     private static final int REDIS_TIMEOUT = Integer.parseInt(System.getenv().getOrDefault("REDIS_TIMEOUT", "2000"));
+    private static final int MAX_ATTEMPTS = 5;
     private static final String REDIS_PASSWORD = System.getenv("REDIS_PASSWORD"); // Optional
 
     // Cache key prefixes for different data types
@@ -40,13 +43,13 @@ public class RedisUtil {
     public static final int MOVIE_TTL = 60 * 60; // 1 hour - Reserved for future use
 
     static {
-        initializePool();
+        initializeCluster();
     }
 
     /**
-     * Initialize the Jedis connection pool
+     * Initialize the JedisCluster
      */
-    private static void initializePool() {
+    private static void initializeCluster() {
         try {
             JedisPoolConfig poolConfig = new JedisPoolConfig();
             poolConfig.setMaxTotal(50);
@@ -55,44 +58,35 @@ public class RedisUtil {
             poolConfig.setTestOnBorrow(true);
             poolConfig.setTestOnReturn(true);
             poolConfig.setTestWhileIdle(true);
-            poolConfig.setMinEvictableIdleTime(Duration.ofSeconds(60)); // Note: Method deprecated in newer versions
             poolConfig.setTimeBetweenEvictionRuns(Duration.ofSeconds(30));
             poolConfig.setNumTestsPerEvictionRun(3);
             poolConfig.setBlockWhenExhausted(true);
 
+            Set<HostAndPort> clusterNodes = new HashSet<>();
+            String[] nodes = REDIS_CLUSTER_NODES.split(",");
+            for (String node : nodes) {
+                String[] parts = node.split(":");
+                clusterNodes.add(new HostAndPort(parts[0], Integer.parseInt(parts[1])));
+            }
+
             if (REDIS_PASSWORD != null && !REDIS_PASSWORD.isEmpty()) {
-                jedisPool = new JedisPool(poolConfig, REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT, REDIS_PASSWORD);
+                jedisCluster = new JedisCluster(clusterNodes, REDIS_TIMEOUT, REDIS_TIMEOUT, MAX_ATTEMPTS, REDIS_PASSWORD, poolConfig);
             } else {
-                jedisPool = new JedisPool(poolConfig, REDIS_HOST, REDIS_PORT, REDIS_TIMEOUT);
+                jedisCluster = new JedisCluster(clusterNodes, REDIS_TIMEOUT, REDIS_TIMEOUT, MAX_ATTEMPTS, poolConfig);
             }
 
             // Test connection
-            try (Jedis jedis = jedisPool.getResource()) {
-                jedis.ping();
-                logger.info("Redis connection pool initialized successfully at {}:{}", REDIS_HOST, REDIS_PORT);
-            }
+            String testKey = "cluster_test_key";
+            jedisCluster.set(testKey, "working");
+            jedisCluster.del(testKey);
+            logger.info("Redis Cluster initialized successfully with nodes: {}", REDIS_CLUSTER_NODES);
         } catch (Exception e) {
-            logger.warn("Failed to initialize Redis connection pool. Redis caching disabled. Error: {}", e.getMessage());
+            logger.warn("Failed to initialize Redis Cluster. Redis caching disabled. Error: {}", e.getMessage());
             redisEnabled = false;
-            if (jedisPool != null) {
-                jedisPool.close();
-                jedisPool = null;
+            if (jedisCluster != null) {
+                try { jedisCluster.close(); } catch (Exception ignore) {}
+                jedisCluster = null;
             }
-        }
-    }
-
-    /**
-     * Get a Jedis instance from the pool
-     */
-    public static Jedis getJedis() {
-        if (!redisEnabled || jedisPool == null) {
-            return null;
-        }
-        try {
-            return jedisPool.getResource();
-        } catch (JedisException e) {
-            logger.error("Failed to get Jedis resource from pool", e);
-            return null;
         }
     }
 
@@ -100,7 +94,7 @@ public class RedisUtil {
      * Check if Redis is enabled and available
      */
     public static boolean isRedisAvailable() {
-        return redisEnabled && jedisPool != null;
+        return redisEnabled && jedisCluster != null;
     }
 
     /**
@@ -110,11 +104,10 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return null;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return null;
-            return jedis.get(key);
+        try {
+            return jedisCluster.get(key);
         } catch (Exception e) {
-            logger.error("Error getting key from Redis: {}", key, e);
+            logger.error("Error getting key from Redis Cluster: {}", key, e);
             return null;
         }
     }
@@ -126,12 +119,11 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return false;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return false;
-            jedis.setex(key, ttlSeconds, value);
+        try {
+            jedisCluster.setex(key, ttlSeconds, value);
             return true;
         } catch (Exception e) {
-            logger.error("Error setting key in Redis: {}", key, e);
+            logger.error("Error setting key in Redis Cluster: {}", key, e);
             return false;
         }
     }
@@ -143,12 +135,11 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return false;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return false;
-            jedis.set(key, value);
+        try {
+            jedisCluster.set(key, value);
             return true;
         } catch (Exception e) {
-            logger.error("Error setting key in Redis: {}", key, e);
+            logger.error("Error setting key in Redis Cluster: {}", key, e);
             return false;
         }
     }
@@ -160,12 +151,11 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return false;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return false;
-            jedis.del(key);
+        try {
+            jedisCluster.del(key);
             return true;
         } catch (Exception e) {
-            logger.error("Error deleting key from Redis: {}", key, e);
+            logger.error("Error deleting key from Redis Cluster: {}", key, e);
             return false;
         }
     }
@@ -177,11 +167,10 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return false;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return false;
-            return jedis.exists(key);
+        try {
+            return jedisCluster.exists(key);
         } catch (Exception e) {
-            logger.error("Error checking key existence in Redis: {}", key, e);
+            logger.error("Error checking key existence in Redis Cluster: {}", key, e);
             return false;
         }
     }
@@ -193,11 +182,10 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return null;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return null;
-            return jedis.incr(key);
+        try {
+            return jedisCluster.incr(key);
         } catch (Exception e) {
-            logger.error("Error incrementing key in Redis: {}", key, e);
+            logger.error("Error incrementing key in Redis Cluster: {}", key, e);
             return null;
         }
     }
@@ -209,11 +197,10 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return null;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return null;
-            return jedis.zincrby(key, score, member);
+        try {
+            return jedisCluster.zincrby(key, score, member);
         } catch (Exception e) {
-            logger.error("Error incrementing sorted set member in Redis: {}", key, e);
+            logger.error("Error incrementing sorted set member in Redis Cluster: {}", key, e);
             return null;
         }
     }
@@ -225,11 +212,11 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return null;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return null;
-            return jedis.zrevrange(key, start, stop);
+        try {
+            Set<String> result = jedisCluster.zrevrange(key, start, stop);
+            return result != null ? result.stream().collect(Collectors.toList()) : null;
         } catch (Exception e) {
-            logger.error("Error getting zrevrange from Redis: {}", key, e);
+            logger.error("Error getting zrevrange from Redis Cluster: {}", key, e);
             return null;
         }
     }
@@ -241,57 +228,61 @@ public class RedisUtil {
         if (!isRedisAvailable()) {
             return false;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return false;
-            jedis.expire(key, ttlSeconds);
+        try {
+            jedisCluster.expire(key, ttlSeconds);
             return true;
         } catch (Exception e) {
-            logger.error("Error setting expiration for key in Redis: {}", key, e);
+            logger.error("Error setting expiration for key in Redis Cluster: {}", key, e);
             return false;
         }
     }
 
     /**
-     * Close the Jedis pool (should be called on application shutdown)
+     * Close the JedisCluster (should be called on application shutdown)
      */
     public static void shutdown() {
-        if (jedisPool != null && !jedisPool.isClosed()) {
-            jedisPool.close();
-            logger.info("Redis connection pool closed");
+        if (jedisCluster != null) {
+            try {
+                jedisCluster.close();
+                logger.info("Redis Cluster connection closed");
+            } catch (Exception e) {
+                logger.error("Error closing Redis Cluster connection", e);
+            }
         }
     }
 
     /**
-     * Clear all keys matching a pattern (use carefully!)
+     * Clear all keys matching a pattern (use carefully in Cluster!)
      */
     public static boolean clearPattern(String pattern) {
         if (!isRedisAvailable()) {
             return false;
         }
-        try (Jedis jedis = getJedis()) {
-            if (jedis == null) return false;
-            var keys = jedis.keys(pattern);
-            if (keys != null && !keys.isEmpty()) {
-                jedis.del(keys.toArray(new String[0]));
-                logger.info("Cleared {} keys matching pattern: {}", keys.size(), pattern);
+        try {
+            // In a cluster, we need to iterate over all master nodes to find keys
+            Set<String> allKeys = new HashSet<>();
+            jedisCluster.getClusterNodes().values().forEach(pool -> {
+                try (var jedis = pool.getResource()) {
+                    allKeys.addAll(jedis.keys(pattern));
+                } catch (Exception ignore) {}
+            });
+
+            if (!allKeys.isEmpty()) {
+                jedisCluster.del(allKeys.toArray(new String[0]));
+                logger.info("Cleared {} keys matching pattern: {} from Cluster", allKeys.size(), pattern);
             }
             return true;
         } catch (Exception e) {
-            logger.error("Error clearing pattern in Redis: {}", pattern, e);
+            logger.error("Error clearing pattern in Redis Cluster: {}", pattern, e);
             return false;
         }
     }
 
     /**
-     * Get Redis pool statistics for monitoring
+     * Get JedisCluster instance (for advanced operations)
+     * Note: Use with caution as it's cluster-wide
      */
-    public static String getPoolStats() {
-        if (jedisPool == null) {
-            return "Redis pool not initialized";
-        }
-        return String.format("Active: %d, Idle: %d, Waiters: %d",
-                jedisPool.getNumActive(),
-                jedisPool.getNumIdle(),
-                jedisPool.getNumWaiters());
+    public static JedisCluster getCluster() {
+        return jedisCluster;
     }
 }

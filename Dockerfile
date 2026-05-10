@@ -34,8 +34,7 @@ EXPOSE 8080
 EXPOSE 8443
 
 # Environment variables with defaults
-ENV REDIS_HOST=localhost
-ENV REDIS_PORT=6379
+ENV REDIS_CLUSTER_NODES=redis-node-1:6379,redis-node-2:6379,redis-node-3:6379
 ENV DB_DRIVER=org.postgresql.Driver
 ENV DB_URL=jdbc:postgresql://localhost:5432/fabflix
 ENV DB_USERNAME=postgres

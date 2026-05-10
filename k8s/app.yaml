@@ -24,10 +24,8 @@ spec:
           value: postgres
         - name: DB_PASSWORD
           value: password
-        - name: REDIS_HOST
-          value: redis-service
-        - name: REDIS_PORT
-          value: "6379"
+        - name: REDIS_CLUSTER_NODES
+          value: redis-node-1:6379,redis-node-2:6379,redis-node-3:6379
         - name: TMDB_API_KEY
           valueFrom:
             secretKeyRef:
