@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: fabflix-db-primary
+spec:
+  serviceName: "db-primary"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fabflix-db
+      role: primary
+  template:
+    metadata:
+      labels:
+        app: fabflix-db
+        role: primary
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: fabflix
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fabflix-secrets
+              key: db-password
+        command: ["postgres"]
+        args:
+          - "-c"
+          - "wal_level=replica"
+          - "-c"
+          - "max_wal_senders=10"
+          - "-c"
+          - "max_replication_slots=10"
+          - "-c"
+          - "hot_standby=on"
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: db-data
+          mountPath: /var/lib/postgresql/data
+        # We should also mount the sql scripts for initialization
+  volumeClaimTemplates:
+  - metadata:
+      name: db-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-primary
+spec:
+  selector:
+    app: fabflix-db
+    role: primary
+  ports:
+  - port: 5432
+    targetPort: 5432

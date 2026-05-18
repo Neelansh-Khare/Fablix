@@ -1,4 +1,4 @@
-# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-04-13
+# FabFlix Project Development Roadmap V2 (2025-12-29) - UPDATED 2026-05-17
 
 This document is an updated roadmap for the FabFlix application, reflecting the current codebase status and incorporating new requirements for Redis integration and production-grade architecture.
 
@@ -43,19 +43,22 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
     *   **Environment Configuration:** Updated `DBConnectionUtil` to support configuration via Environment Variables.
     *   **HTTPS Support:** Configured Tomcat with self-signed certificate and HTTPS connector in `server.xml`.
     *   **Database Optimization:** Moved movie detail retrieval logic into `get_movie_details` PostgreSQL stored function.
+*   **[x] Advanced Architecture & Scalability (2026-05-17):**
+    *   **Redis Cluster:** Multi-node Redis for high availability. Implemented with a 6-node cluster and JedisCluster.
+    *   **Automated DB Replication:** Finalized Master-Slave streaming replication with automated initialization in Docker.
+    *   **Production K8s Manifests:** Created production-grade StatefulSet manifests for PostgreSQL and Redis Cluster.
 
 ---
 
 ## 1. Current Status Overview
-*   **Architecture:** Java Servlets + JSP + PostgreSQL + Redis + jQuery Frontend.
+*   **Architecture:** Java Servlets + JSP + PostgreSQL (Primary/Replica) + Redis Cluster + jQuery Frontend.
 *   **Authentication:** BCrypt-based security. `AdminFilter` protects admin routes.
 *   **Posters:** Robust TMDB integration with Redis caching and rate limiting.
 *   **Cart/Checkout:** Server-side implementation with `CartServlet`.
-*   **Database:** HikariCP connection pooling enabled.
-*   **Caching:** Redis integrated for poster and autocomplete caching, session management ready.
-*   **Analytics:** Basic tracking of cache performance and popular searches in Redis, viewable via the Admin Dashboard.
-*   **Recommendations:** Basic content-based and collaborative filtering implemented via stored functions.
-*   **Deployment:** Docker-ready with HTTPS enabled.
+*   **Database:** HikariCP connection pooling with Read/Write splitting.
+*   **Caching:** Redis Cluster integrated for poster and autocomplete caching.
+*   **Analytics:** Cache performance and popular searches tracking in Redis.
+*   **Deployment:** Docker-ready with automated replication and production-grade K8s manifests.
 
 ---
 
@@ -81,42 +84,14 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 ### 4.1. Redis Integration - COMPLETED (2026-02-02)
 *   **[x] Task:** Integrated Redis for application caching and distributed session support
 *   **Implementation Details:**
-    1.  **Redis Setup:**
-        *   Created `docker-compose.yml` for easy Redis deployment
-        *   Redis container running with persistent storage and health checks
-        *   Configuration via environment variables (REDIS_HOST, REDIS_PORT, etc.)
-    2.  **Dependencies Added:**
-        *   `redis.clients:jedis:5.1.0` - Redis client library
-        *   `org.redisson:redisson-tomcat-9:3.25.2` - Session management
-    3.  **RedisUtil Class Created:**
-        *   Connection pooling with 50 max connections, auto-retry logic
-        *   Helper methods for get/set/delete/exists operations
-        *   Graceful degradation - app continues to work if Redis is unavailable
-        *   Predefined key prefixes: `movie_poster:`, `autocomplete:`, `movie:`
-        *   **File:** `src/main/java/com/neelanshkhare/fabflix/util/RedisUtil.java`
-    4.  **MoviePosterUtil Integration:**
-        *   Migrated from java.util.logging to SLF4J
-        *   Redis cache-aside pattern: Check Redis → Fetch from TMDB → Store in Redis
-        *   7-day TTL for poster data
-        *   Serialization to JSON for storage
-        *   **Cache hit/miss logging** for monitoring
-    5.  **Session Management (Optional):**
-        *   `context.xml` configured for Redisson session manager
-        *   `redisson.yaml` configuration file created
-        *   Commented out by default (enable for production multi-instance deployment)
-    6.  **Lifecycle Management:**
-        *   `RedisShutdownListener` ensures proper Redis pool shutdown
-    7.  **Documentation:**
-        *   `REDIS_SETUP.md` - Complete setup and usage guide
-        *   Includes Docker commands, monitoring, and troubleshooting
+    1.  **Redis Setup:** Created `docker-compose.yml` for easy Redis deployment.
+    2.  **Dependencies Added:** `jedis:5.1.0`, `redisson-tomcat-9:3.25.2`.
+    3.  **RedisUtil Class Created:** Connection pooling, JedisCluster support, graceful degradation.
+    4.  **MoviePosterUtil Integration:** Cache-aside pattern with 7-day TTL.
+    5.  **Session Management:** Redisson configured for distributed sessions.
+    6.  **Lifecycle Management:** `RedisShutdownListener` for graceful shutdown.
 
-*   **Benefits Achieved:**
-    *   90% reduction in TMDB API calls for cached movies
-    *   Persistent cache survives application restarts
-    *   Prepared for horizontal scaling (session sharing)
-    *   Production-grade connection pooling
-
-### 4.2. Redis Enhancements - COMPLETED (2026-05-10)
+### 4.2. Redis Enhancements - COMPLETED (2026-05-17)
 *   **[x] Redis Cluster:** Multi-node Redis for high availability. Implemented with a 6-node cluster (3 masters, 3 replicas) and JedisCluster integration.
 
 ---
@@ -126,14 +101,14 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 ### 5.1. Critical Infrastructure
 *   **[x] Connection Pooling:** Replaced custom `DBConnectionUtil` with **HikariCP**.
 *   **[x] Logging & Error Handling:** Replaced `e.printStackTrace()` with structured logging (SLF4J/Logback).
-*   **[x] HTTPS Implementation:** Configured Tomcat to serve content over HTTPS (Self-signed). (2026-04-13)
-*   **[x] Global Exception Handling:** Custom error pages (404, 500) and `java.lang.Throwable` handler implemented in `web.xml`. (2026-03-23)
+*   **[x] HTTPS Implementation:** Configured Tomcat to serve content over HTTPS.
+*   **[x] Global Exception Handling:** Custom error pages and global exception handler.
 
 ### 5.2. AWS Deployment
 *   **[ ] EC2 Deployment:** Deploy to AWS EC2 (Free Tier).
 *   **[ ] Load Balancing:**
-    *   *Phase A:* Set up **Apache HTTP Server** as a software load balancer/reverse proxy.
-    *   *Phase B:* Migrate to **AWS Elastic Load Balancer (ELB)** and Auto Scaling Group (ASG).
+    *   *Phase A:* Set up **Apache HTTP Server** as a software load balancer. (COMPLETED 2026-04-27)
+    *   *Phase B:* Migrate to **AWS Elastic Load Balancer (ELB)**.
 
 ---
 
@@ -141,49 +116,35 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 
 ### 6.1. Database Optimization
 *   **[x] Database Optimization:**
-    *   Moved movie detail retrieval logic into `get_movie_details` PostgreSQL stored function. (2026-04-13)
-    *   Optimized search and browsing queries using `search_movies_optimized` and `count_movies_filtered` stored functions. (2026-04-20)
-    *   Updated `search_movies_optimized` to support `star_id` and refactored `MovieDAOImpl` to use it for all search/browse operations. (2026-04-27)
-*   **[x] Load Balancing:** Set up Apache HTTP Server as a software load balancer in Docker Compose. (2026-04-27)
-*   **[x] Distributed Sessions:** Enabled Redisson session management for horizontal scaling across multiple Tomcat instances. (2026-04-27)
-*   **[x] Read/Write Splitting:** Updated `DBConnectionUtil` and DAOs to support separate write (primary) and read (replica) database pools. (2026-04-27)
-*   **[x] Kubernetes Manifests:** Created initial deployment and service manifests for K8s orchestration. (2026-04-27)
-*   **[ ] PostgreSQL Replication:** Finalize Master-Slave replication configuration (scripts/automated setup).
+    *   Moved movie detail retrieval logic into `get_movie_details` PostgreSQL stored function.
+    *   Optimized search and browsing queries using stored functions.
+    *   Updated `search_movies_optimized` to support `star_id`.
+*   **[x] Load Balancing:** Apache HTTP Server as software load balancer in Docker Compose.
+*   **[x] Distributed Sessions:** Enabled Redisson session management.
+*   **[x] Read/Write Splitting:** Supported separate write (primary) and read (replica) database pools.
+*   **[x] Kubernetes Manifests:** Created production-grade StatefulSet manifests for K8s orchestration. (COMPLETED 2026-05-17)
+*   **[x] PostgreSQL Replication:** Finalized Master-Slave streaming replication with automated setup. (COMPLETED 2026-05-17)
 
 
 ### 6.2. Containerization (Long Term)
-*   **[x] Docker:** Containerized the application stack using `Dockerfile` and `docker-compose.yml`. (2026-04-13)
-*   **[ ] Kubernetes:** Deploy to a Kubernetes cluster for orchestration, replacing the manual EC2/ASG setup.
+*   **[x] Docker:** Containerized the application stack using Docker Compose.
+*   **[ ] Kubernetes:** Deploy to a managed Kubernetes cluster (EKS/GKE).
 
 ---
 
 ## 7. User Recommendations (Priority 5)
 
 ### 7.1. Simple Recommendation Engine - PHASE 1 COMPLETED (2026-04-06)
-*   **[x] Content-Based Filtering:** Recommend movies based on genres. Implemented via `get_similar_movies` stored function.
-*   **[x] Collaborative Filtering (Basic):** Recommend movies based on what similar users have purchased ("Users who bought this also bought"). Implemented via `get_co_purchase_recommendations` stored function.
-*   **[x] Integration:** Movie details API now returns `similarMovies` and `coPurchaseRecommendations`.
-
-### 7.2. Implementation Steps
-1.  (Done) Create recommendation stored functions.
-2.  (Done) Implement `MovieService` methods to fetch recommendations.
-3.  (Done) Update `MovieServlet` to include recommendations in movie detail response.
-4.  (Done) Add recommendation display on movie detail pages UI (main.js/movie-detail.jsp).
-5.  (Optional) Periodic batch job to refresh recommendations.
+*   **[x] Content-Based Filtering:** Recommend movies based on genres.
+*   **[x] Collaborative Filtering (Basic):** "Users who bought this also bought".
+*   **[x] Integration:** Movie details API returns recommendations.
 
 ---
 
 ## 8. Summary of Remaining Tasks
 
-Here is a simplified list of the major features and improvements that are still pending:
-
-*   **Redis Enhancements:**
-    *   Set up a Redis Cluster for high availability.
 *   **Production Readiness:**
     *   Deploy the application stack to AWS EC2 using Docker Compose.
-    *   Configure a load balancer (first Apache, then AWS ELB).
-*   **Database & Scalability:**
-    *   Optimize remaining complex queries (e.g., browsing/searching) using Stored Procedures.
-    *   Implement Master-Slave database replication.
+    *   Configure AWS Elastic Load Balancer (ELB).
 *   **Containerization:**
-    *   Orchestrate with Kubernetes.
+    *   Deploy to a managed Kubernetes cluster.

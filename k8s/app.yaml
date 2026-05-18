@@ -14,18 +14,21 @@ spec:
     spec:
       containers:
       - name: fabflix-app
-        image: fabflix-app:latest # User would build and push this
+        image: fabflix-app:latest
         env:
         - name: DB_URL_WRITE
-          value: jdbc:postgresql://db-service:5432/fabflix
+          value: jdbc:postgresql://db-primary:5432/fabflix
         - name: DB_URL_READ
-          value: jdbc:postgresql://db-service:5432/fabflix # Simplified for k8s demo
+          value: jdbc:postgresql://db-replica:5432/fabflix
         - name: DB_USERNAME
           value: postgres
         - name: DB_PASSWORD
-          value: password
+          valueFrom:
+            secretKeyRef:
+              name: fabflix-secrets
+              key: db-password
         - name: REDIS_CLUSTER_NODES
-          value: redis-node-1:6379,redis-node-2:6379,redis-node-3:6379
+          value: "redis-cluster-0.redis-cluster:6379,redis-cluster-1.redis-cluster:6379,redis-cluster-2.redis-cluster:6379,redis-cluster-3.redis-cluster:6379,redis-cluster-4.redis-cluster:6379,redis-cluster-5.redis-cluster:6379"
         - name: TMDB_API_KEY
           valueFrom:
             secretKeyRef:
