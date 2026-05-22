@@ -179,6 +179,7 @@ function displayMovies(movies) {
                          alt="${movie.title} poster" 
                          onerror="this.src='images/no-poster.jpg';"
                          onload="console.log('Successfully loaded poster for ${movie.title}');">
+                    ${movie.rating > 0 ? `<div class="movie-rating-badge"><i class="fas fa-star"></i> ${movie.rating.toFixed(1)}</div>` : ''}
                 </div>
                 <div class="movie-info">
                     <div class="movie-title">${movie.title}</div>
@@ -872,6 +873,16 @@ function displayMovieDetails(movie) {
                     <div class="movie-detail-director">Directed by ${movie.director}</div>
                 </div>
                 
+                ${movie.rating > 0 ? `
+                <div class="movie-detail-rating">
+                    <div class="stars-outer">
+                        <div class="stars-inner" style="width: ${movie.rating * 10}%"></div>
+                    </div>
+                    <span class="rating-number">${movie.rating.toFixed(1)}</span>
+                    <span class="vote-count">(${movie.numVotes.toLocaleString()} votes)</span>
+                </div>
+                ` : ''}
+                
                 <div class="movie-detail-genres">
                     <h3>Genres</h3>
                     <div class="genre-tags">
@@ -1266,6 +1277,69 @@ $('<style>')
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        /* Rating Styles */
+        .movie-rating-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.75);
+            color: #f1c40f;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            z-index: 10;
+        }
+
+        .movie-detail-rating {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stars-outer {
+            position: relative;
+            display: inline-block;
+            font-family: "Font Awesome 5 Free";
+            font-weight: 900;
+        }
+
+        .stars-outer::before {
+            content: "\f005 \f005 \f005 \f005 \f005";
+            color: #ccc;
+            font-size: 1.2em;
+        }
+
+        .stars-inner {
+            position: absolute;
+            top: 0;
+            left: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            width: 0;
+        }
+
+        .stars-inner::before {
+            content: "\f005 \f005 \f005 \f005 \f005";
+            color: #f1c40f;
+            font-size: 1.2em;
+        }
+
+        .rating-number {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .vote-count {
+            color: #777;
+            font-size: 0.9em;
         }
     `)
     .appendTo('head');

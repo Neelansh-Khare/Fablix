@@ -32,6 +32,7 @@ public class MoviePosterUtil {
         private String trailerUrl;
         private String overview;
         private double rating;
+        private int numVotes;
         private int tmdbId;
 
         public MoviePosterResult() {}
@@ -51,6 +52,9 @@ public class MoviePosterUtil {
 
         public double getRating() { return rating; }
         public void setRating(double rating) { this.rating = rating; }
+
+        public int getNumVotes() { return numVotes; }
+        public void setNumVotes(int numVotes) { this.numVotes = numVotes; }
 
         public int getTmdbId() { return tmdbId; }
         public void setTmdbId(int tmdbId) { this.tmdbId = tmdbId; }
@@ -336,6 +340,11 @@ public class MoviePosterUtil {
                 result.setRating(movieJson.getDouble("vote_average"));
             }
 
+            // Set vote count
+            if (movieJson.has("vote_count")) {
+                result.setNumVotes(movieJson.getInt("vote_count"));
+            }
+
         } catch (Exception e) {
             LOGGER.warn("Error parsing TMDB movie result", e);
         }
@@ -353,6 +362,7 @@ public class MoviePosterUtil {
         json.put("trailerUrl", result.getTrailerUrl());
         json.put("overview", result.getOverview());
         json.put("rating", result.getRating());
+        json.put("numVotes", result.getNumVotes());
         json.put("tmdbId", result.getTmdbId());
         return json.toString();
     }
@@ -369,6 +379,7 @@ public class MoviePosterUtil {
         if (json.has("trailerUrl")) result.setTrailerUrl(json.optString("trailerUrl", null));
         if (json.has("overview")) result.setOverview(json.optString("overview", null));
         if (json.has("rating")) result.setRating(json.optDouble("rating", 0.0));
+        if (json.has("numVotes")) result.setNumVotes(json.optInt("numVotes", 0));
         if (json.has("tmdbId")) result.setTmdbId(json.optInt("tmdbId", 0));
 
         return result;

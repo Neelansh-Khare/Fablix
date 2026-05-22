@@ -10,12 +10,16 @@ public class Movie {
     private String director;
     private String bannerUrl;
     private String trailerUrl;
+    private double rating;
+    private int numVotes;
     private List<Star> stars;
     private List<Genre> genres;
 
     public Movie() {
         this.stars = new ArrayList<>();
         this.genres = new ArrayList<>();
+        this.rating = 0.0;
+        this.numVotes = 0;
     }
 
     public Movie(String id, String title, int year, String director) {
@@ -25,6 +29,8 @@ public class Movie {
         this.director = director;
         this.stars = new ArrayList<>();
         this.genres = new ArrayList<>();
+        this.rating = 0.0;
+        this.numVotes = 0;
     }
 
     // Getters and setters
@@ -45,6 +51,12 @@ public class Movie {
 
     public String getTrailerUrl() { return trailerUrl; }
     public void setTrailerUrl(String trailerUrl) { this.trailerUrl = trailerUrl; }
+
+    public double getRating() { return rating; }
+    public void setRating(double rating) { this.rating = rating; }
+
+    public int getNumVotes() { return numVotes; }
+    public void setNumVotes(int numVotes) { this.numVotes = numVotes; }
 
     public List<Star> getStars() { return stars; }
     public void setStars(List<Star> stars) { this.stars = stars; }

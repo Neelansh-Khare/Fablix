@@ -12,9 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class MovieDAOImpl implements MovieDAO {
     private static final Logger logger = LoggerFactory.getLogger(MovieDAOImpl.class);
@@ -51,6 +49,8 @@ public class MovieDAOImpl implements MovieDAO {
         movie.setDirector(movieJson.getString("director"));
         movie.setBannerUrl(movieJson.optString("bannerUrl", null));
         movie.setTrailerUrl(movieJson.optString("trailerUrl", null));
+        movie.setRating(movieJson.optDouble("rating", 0.0));
+        movie.setNumVotes(movieJson.optInt("numVotes", 0));
 
         // Parse genres
         if (movieJson.has("genres") && !movieJson.isNull("genres")) {
@@ -256,6 +256,9 @@ public class MovieDAOImpl implements MovieDAO {
 
                 int affectedRows = stmt.executeUpdate();
                 if (affectedRows == 1) {
+                    // Update ratings
+                    updateMovieRatings(conn, movie);
+
                     if (movie.getStars() != null && !movie.getStars().isEmpty()) {
                         insertStarsInMovie(conn, movie);
                     }
@@ -360,6 +363,9 @@ public class MovieDAOImpl implements MovieDAO {
 
                 int affectedRows = stmt.executeUpdate();
                 if (affectedRows == 1) {
+                    // Update ratings
+                    updateMovieRatings(conn, movie);
+
                     deleteStarsInMovie(conn, movie.getId());
                     if (movie.getStars() != null && !movie.getStars().isEmpty()) {
                         insertStarsInMovie(conn, movie);
@@ -384,6 +390,36 @@ public class MovieDAOImpl implements MovieDAO {
         }
 
         return success;
+    }
+
+    private void updateMovieRatings(Connection conn, Movie movie) throws SQLException {
+        // First check if it exists
+        String checkSql = "SELECT 1 FROM ratings WHERE movie_id = ?";
+        boolean exists = false;
+        try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+            checkStmt.setString(1, movie.getId());
+            try (ResultSet rs = checkStmt.executeQuery()) {
+                exists = rs.next();
+            }
+        }
+
+        if (exists) {
+            String updateSql = "UPDATE ratings SET rating = ?, num_votes = ? WHERE movie_id = ?";
+            try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                updateStmt.setDouble(1, movie.getRating());
+                updateStmt.setInt(2, movie.getNumVotes());
+                updateStmt.setString(3, movie.getId());
+                updateStmt.executeUpdate();
+            }
+        } else {
+            String insertSql = "INSERT INTO ratings (movie_id, rating, num_votes) VALUES (?, ?, ?)";
+            try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                insertStmt.setString(1, movie.getId());
+                insertStmt.setDouble(2, movie.getRating());
+                insertStmt.setInt(3, movie.getNumVotes());
+                insertStmt.executeUpdate();
+            }
+        }
     }
 
     private void deleteStarsInMovie(Connection conn, String movieId) throws SQLException {
@@ -412,6 +448,13 @@ public class MovieDAOImpl implements MovieDAO {
             try {
                 deleteStarsInMovie(conn, id);
                 deleteGenresInMovie(conn, id);
+                // Also delete ratings
+                String deleteRatingsSql = "DELETE FROM ratings WHERE movie_id = ?";
+                try (PreparedStatement ratingsStmt = conn.prepareStatement(deleteRatingsSql)) {
+                    ratingsStmt.setString(1, id);
+                    ratingsStmt.executeUpdate();
+                }
+
                 try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                     stmt.setString(1, id);
                     int affectedRows = stmt.executeUpdate();
@@ -469,6 +512,10 @@ public class MovieDAOImpl implements MovieDAO {
                             movie.setBannerUrl(rs.getString(i));
                         } else if ("trailer_url".equals(columnName)) {
                             movie.setTrailerUrl(rs.getString(i));
+                        } else if ("rating".equals(columnName)) {
+                            movie.setRating(rs.getDouble(i));
+                        } else if ("num_votes".equals(columnName)) {
+                            movie.setNumVotes(rs.getInt(i));
                         }
                     }
                     movies.add(movie);

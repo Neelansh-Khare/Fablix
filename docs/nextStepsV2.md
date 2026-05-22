@@ -37,6 +37,11 @@ This document is an updated roadmap for the FabFlix application, reflecting the 
 *   **[x] Recommendation Engine Phase 1 (2026-04-06):**
     *   Created `sql/get_recommendations.sql` with stored functions for similar movies and co-purchase recommendations.
     *   Integrated recommendations into `MovieDAO`, `MovieService`, and `MovieServlet`.
+*   **[x] Rating Integration (2026-05-21):**
+    *   Synchronized and stored movie ratings and vote counts from TMDB into the local database.
+    *   Updated `Movie` model and DAOs to support rating persistence.
+    *   Optimized stored functions (`get_movie_details`, `search_movies_optimized`) to include rating data and support sorting by rating.
+    *   Enhanced UI with rating badges in movie lists and star ratings on detail pages.
 *   **[x] UI & DevOps Enhancements (2026-04-13):**
     *   **Recommendation UI:** Added "Similar Movies" and "Users also bought" sections to the movie details page in `main.js`.
     *   **Containerization:** Created `Dockerfile` and `docker-compose.yml` for full application stack (App + DB + Redis).

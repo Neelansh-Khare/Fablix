@@ -199,6 +199,10 @@ public class MovieService {
                         movie.setTrailerUrl(posterResult.getTrailerUrl());
                     }
 
+                    // Update ratings and votes from TMDB
+                    movie.setRating(posterResult.getRating());
+                    movie.setNumVotes(posterResult.getNumVotes());
+
                     // Save to database
                     boolean updated = movieDAO.update(movie);
 

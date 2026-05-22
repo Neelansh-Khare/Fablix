@@ -78,6 +78,8 @@ public class MovieServlet extends HttpServlet {
                     movieObj.put("director", movie.getDirector());
                     movieObj.put("bannerUrl", movie.getBannerUrl());
                     movieObj.put("trailerUrl", movie.getTrailerUrl());
+                    movieObj.put("rating", movie.getRating());
+                    movieObj.put("numVotes", movie.getNumVotes());
 
                     // Add genres
                     JSONArray genresArray = new JSONArray();
@@ -118,6 +120,8 @@ public class MovieServlet extends HttpServlet {
                     movieObj.put("director", movie.getDirector());
                     movieObj.put("bannerUrl", movie.getBannerUrl());
                     movieObj.put("trailerUrl", movie.getTrailerUrl());
+                    movieObj.put("rating", movie.getRating());
+                    movieObj.put("numVotes", movie.getNumVotes());
 
                     // Add genres
                     JSONArray genresArray = new JSONArray();
@@ -333,6 +337,7 @@ public class MovieServlet extends HttpServlet {
                     JSONObject starObj = starsArray.getJSONObject(i);
                     Star star = new Star();
                     star.setId(starObj.getString("id"));
+                    star.setName(starObj.getString("name"));
                     movie.addStar(star);
                 }
             }

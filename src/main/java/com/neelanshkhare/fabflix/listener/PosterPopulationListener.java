@@ -192,6 +192,10 @@ public class PosterPopulationListener implements ServletContextListener {
             movie.setTrailerUrl(result.getTrailerUrl());
         }
 
+        // Update ratings and votes
+        movie.setRating(result.getRating());
+        movie.setNumVotes(result.getNumVotes());
+
         return movieService.updateMovie(movie);
     }
 }
