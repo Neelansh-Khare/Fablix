@@ -43,15 +43,13 @@ public class AdminAnalyticsServlet extends HttpServlet {
             // Get popular searches with scores
             JSONArray popularSearchesArray = new JSONArray();
             if (RedisUtil.isRedisAvailable()) {
-                try (Jedis jedis = RedisUtil.getJedis()) {
-                    if (jedis != null) {
-                        List<Tuple> topSearches = jedis.zrevrangeWithScores(RedisUtil.POPULAR_SEARCHES_KEY, 0, 9);
-                        for (Tuple tuple : topSearches) {
-                            JSONObject searchObj = new JSONObject();
-                            searchObj.put("query", tuple.getElement());
-                            searchObj.put("score", tuple.getScore());
-                            popularSearchesArray.put(searchObj);
-                        }
+                if (RedisUtil.getCluster() != null) {
+                    List<Tuple> topSearches = RedisUtil.getCluster().zrevrangeWithScores(RedisUtil.POPULAR_SEARCHES_KEY, 0, 9);
+                    for (Tuple tuple : topSearches) {
+                        JSONObject searchObj = new JSONObject();
+                        searchObj.put("query", tuple.getElement());
+                        searchObj.put("score", tuple.getScore());
+                        popularSearchesArray.put(searchObj);
                     }
                 }
             }

@@ -3,8 +3,9 @@ package com.neelanshkhare.fabflix.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.ConnectionPoolConfig;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.time.Duration;
@@ -51,7 +52,7 @@ public class RedisUtil {
      */
     private static void initializeCluster() {
         try {
-            JedisPoolConfig poolConfig = new JedisPoolConfig();
+            ConnectionPoolConfig poolConfig = new ConnectionPoolConfig();
             poolConfig.setMaxTotal(50);
             poolConfig.setMaxIdle(20);
             poolConfig.setMinIdle(5);
@@ -213,8 +214,7 @@ public class RedisUtil {
             return null;
         }
         try {
-            Set<String> result = jedisCluster.zrevrange(key, start, stop);
-            return result != null ? result.stream().collect(Collectors.toList()) : null;
+            return jedisCluster.zrevrange(key, start, stop);
         } catch (Exception e) {
             logger.error("Error getting zrevrange from Redis Cluster: {}", key, e);
             return null;
@@ -261,8 +261,11 @@ public class RedisUtil {
         try {
             // In a cluster, we need to iterate over all master nodes to find keys
             Set<String> allKeys = new HashSet<>();
-            jedisCluster.getClusterNodes().values().forEach(pool -> {
-                try (var jedis = pool.getResource()) {
+            jedisCluster.getClusterNodes().forEach((nodeKey, pool) -> {
+                try (Jedis jedis = new Jedis(nodeKey)) {
+                    if (REDIS_PASSWORD != null && !REDIS_PASSWORD.isEmpty()) {
+                        jedis.auth(REDIS_PASSWORD);
+                    }
                     allKeys.addAll(jedis.keys(pattern));
                 } catch (Exception ignore) {}
             });
