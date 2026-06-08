@@ -1,10 +1,15 @@
 package com.neelanshkhare.fabflix.servlet;
 
+import com.neelanshkhare.fabflix.dao.OrderDAO;
+import com.neelanshkhare.fabflix.dao.impl.OrderDAOImpl;
 import com.neelanshkhare.fabflix.model.Customer;
+import com.neelanshkhare.fabflix.model.Order;
+import com.neelanshkhare.fabflix.model.OrderItem;
 import com.neelanshkhare.fabflix.service.CustomerService;
 import com.neelanshkhare.fabflix.util.RecaptchaUtil;
 import com.neelanshkhare.fabflix.util.RateLimiterUtil;
 import com.neelanshkhare.fabflix.util.PasswordPolicyUtil;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import javax.servlet.ServletException;
@@ -15,18 +20,21 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @WebServlet("/api/customers/*")
 public class CustomerServlet extends HttpServlet {
     private CustomerService customerService;
+    private OrderDAO orderDAO;
     private static final Logger LOGGER = Logger.getLogger(CustomerServlet.class.getName());
 
     @Override
     public void init() throws ServletException {
         super.init();
         customerService = new CustomerService();
+        orderDAO = new OrderDAOImpl();
     }
 
     @Override
@@ -71,6 +79,35 @@ public class CustomerServlet extends HttpServlet {
                     error.put("message", "Customer not found");
                     out.print(error.toString());
                 }
+            } else if (pathInfo.equals("/orders")) {
+                // Get order history for the current customer
+                int customerId = (Integer) session.getAttribute("customerId");
+                List<Order> orders = orderDAO.findByCustomer(customerId);
+
+                JSONArray ordersArray = new JSONArray();
+                for (Order order : orders) {
+                    JSONObject orderObj = new JSONObject();
+                    orderObj.put("id", order.getId());
+                    orderObj.put("orderDate", order.getOrderDate().toString());
+                    orderObj.put("totalAmount", order.getTotalAmount());
+                    orderObj.put("status", order.getStatus());
+                    orderObj.put("paymentMethod", order.getPaymentMethod());
+
+                    JSONArray itemsArray = new JSONArray();
+                    for (OrderItem item : order.getOrderItems()) {
+                        JSONObject itemObj = new JSONObject();
+                        itemObj.put("movieId", item.getMovieId());
+                        itemObj.put("movieTitle", item.getMovieTitle());
+                        itemObj.put("quantity", item.getQuantity());
+                        itemObj.put("unitPrice", item.getUnitPrice());
+                        itemObj.put("totalPrice", item.getTotalPrice());
+                        itemsArray.put(itemObj);
+                    }
+                    orderObj.put("items", itemsArray);
+                    ordersArray.put(orderObj);
+                }
+
+                out.print(ordersArray.toString());
             } else {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 JSONObject error = new JSONObject();

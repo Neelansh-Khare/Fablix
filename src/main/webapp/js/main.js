@@ -357,7 +357,207 @@ function setupEventListeners() {
         });
     });
 
-    // Search form
+    // Profile link
+    $('#profile-link').click(function(e) {
+        e.preventDefault();
+        loadProfile();
+    });
+
+    function loadProfile() {
+    // Fetch customer info and order history in parallel
+    const customerReq = $.ajax({ url: 'api/customers', method: 'GET' });
+    const ordersReq = $.ajax({ url: 'api/customers/orders', method: 'GET' });
+
+    $.when(customerReq, ordersReq).done(function(customerRes, ordersRes) {
+        // jQuery returns [data, statusText, jqXHR] for each request when using $.when
+        displayProfile(customerRes[0], ordersRes[0]);
+    }).fail(function() {
+        showErrorMessage('Error loading profile information.');
+    });
+}
+
+function displayProfile(customer, orders) {
+    const container = $('#content-container');
+    container.empty();
+
+    let profileHtml = `
+        <div class="profile-container">
+            <div class="profile-header">
+                <h2>My Account</h2>
+            </div>
+            
+            <div class="profile-section">
+                <h3>Personal Information</h3>
+                <div class="profile-info-grid">
+                    <div class="info-item">
+                        <label>First Name</label>
+                        <div class="info-value">${customer.firstName}</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Last Name</label>
+                        <div class="info-value">${customer.lastName}</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Email Address</label>
+                        <div class="info-value">${customer.email}</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Shipping Address</label>
+                        <div class="info-value">${customer.address}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="profile-section">
+                <h3>Order History</h3>
+                ${orders && orders.length > 0 ? `
+                    <div class="order-history">
+                        <table class="order-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Date</th>
+                                    <th>Items</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${orders.map(order => `
+                                    <tr>
+                                        <td>#${order.id}</td>
+                                        <td>${new Date(order.orderDate).toLocaleDateString()}</td>
+                                        <td>
+                                            <ul class="order-item-list">
+                                                ${order.items.map(item => `
+                                                    <li>${item.movieTitle} x${item.quantity}</li>
+                                                `).join('')}
+                                            </ul>
+                                        </td>
+                                        <td>$${order.totalAmount.toFixed(2)}</td>
+                                        <td><span class="status-badge status-${order.status.toLowerCase()}">${order.status}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : '<p>You haven\'t placed any orders yet.</p>'}
+            </div>
+        </div>
+    `;
+
+    container.append(profileHtml);
+}
+
+// Additional styling for profile and order history
+$('<style>')
+    .prop('type', 'text/css')
+    .html(`
+        .profile-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .profile-header {
+            border-bottom: 2px solid #e74c3c;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+        }
+        
+        .profile-section {
+            margin-bottom: 40px;
+        }
+        
+        .profile-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.2em;
+            border-left: 4px solid #e74c3c;
+            padding-left: 10px;
+        }
+        
+        .profile-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .info-item label {
+            display: block;
+            font-size: 0.85em;
+            color: #777;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .info-value {
+            font-size: 1.1em;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .order-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .order-table th, .order-table td {
+            text-align: left;
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .order-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .order-item-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            font-size: 0.9em;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-completed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        @media (max-width: 768px) {
+            .profile-info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .order-table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+    `)
+    .appendTo('head');
+
+// Search form
     $('#search-form').submit(function(e) {
         e.preventDefault();
 
