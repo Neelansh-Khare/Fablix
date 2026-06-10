@@ -76,6 +76,9 @@ function performLogin(email, password) {
         data: JSON.stringify(loginData),
         success: function(response) {
             console.log('Login successful:', response);
+            if (response.csrfToken) {
+                window.csrfToken = response.csrfToken;
+            }
             $('#login-modal').css('display', 'none');
             checkLoginStatus();
             showSuccessMessage('Login successful! Welcome back.');

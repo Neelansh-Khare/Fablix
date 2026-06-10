@@ -1,3 +1,9 @@
+$.ajaxPrefilter(function(options, originalOptions, jqXHR) {
+    if (options.type !== 'GET' && window.csrfToken) {
+        jqXHR.setRequestHeader('X-CSRF-Token', window.csrfToken);
+    }
+});
+
 $(document).ready(function() {
     // Check login status
     checkLoginStatus();
@@ -345,6 +351,7 @@ function setupEventListeners() {
             url: 'api/auth/logout',
             method: 'GET',
             success: function() {
+                window.csrfToken = null;
                 checkLoginStatus();
                 loadHomePage();
                 showSuccessMessage('You have been logged out successfully.');
