@@ -1,0 +1,80 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fabflix-app-netpol
+spec:
+  podSelector:
+    matchLabels:
+      app: fabflix-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - ports:
+    - port: 8080
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: fabflix-db
+    ports:
+    - port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis-cluster
+    ports:
+    - port: 6379
+  - ports:
+    - port: 443   # TMDB API, reCAPTCHA
+    - port: 53    # DNS
+      protocol: UDP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fabflix-db-netpol
+spec:
+  podSelector:
+    matchLabels:
+      app: fabflix-db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: fabflix-app
+    ports:
+    - port: 5432
+  - from:
+    - podSelector:
+        matchLabels:
+          app: fabflix-db
+    ports:
+    - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-cluster-netpol
+spec:
+  podSelector:
+    matchLabels:
+      app: redis-cluster
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: fabflix-app
+    ports:
+    - port: 6379
+  - from:
+    - podSelector:
+        matchLabels:
+          app: redis-cluster
+    ports:
+    - port: 6379
+    - port: 16379

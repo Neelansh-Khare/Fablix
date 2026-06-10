@@ -55,11 +55,8 @@ public class HealthServlet extends HttpServlet {
         // but for a strict health check in a cluster, we might report it as down.
         // For Fabflix, Redis is used for caching and sessions. Let's report its status.
         
-        // 3. Assemble response
+        // Return only overall status — component details would expose internal infrastructure
         result.put("status", isHealthy ? "UP" : "DOWN");
-        result.put("database", dbOk ? "UP" : "DOWN");
-        result.put("redis", redisOk ? "UP" : "DOWN");
-        result.put("timestamp", System.currentTimeMillis());
 
         if (isHealthy) {
             response.setStatus(HttpServletResponse.SC_OK);

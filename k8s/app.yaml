@@ -41,6 +41,35 @@ spec:
               key: recaptcha-secret
         ports:
         - containerPort: 8080
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /fabflix/api/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /fabflix/api/health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          failureThreshold: 3
+        volumeMounts:
+        - name: redisson-config
+          mountPath: /usr/local/tomcat/webapps/fabflix/WEB-INF/classes/redisson.yaml
+          subPath: redisson.yaml
+      volumes:
+      - name: redisson-config
+        configMap:
+          name: redisson-config
 ---
 apiVersion: v1
 kind: Service

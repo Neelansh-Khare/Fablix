@@ -41,10 +41,26 @@ spec:
         ports:
         - containerPort: 5432
           name: postgres
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres", "-d", "fabflix"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres", "-d", "fabflix"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
         volumeMounts:
         - name: db-data
           mountPath: /var/lib/postgresql/data
-        # We should also mount the sql scripts for initialization
   volumeClaimTemplates:
   - metadata:
       name: db-data

@@ -19,8 +19,12 @@ public class DBConnectionUtil {
 
     private static void initializePools() {
         try {
-            // Write Pool (Master)
-            String writeUrl = ConfigUtil.getProperty("db.url.write", ConfigUtil.getProperty("db.url", "jdbc:postgresql://localhost:5432/fabflix"));
+            // Fail fast if database URL is not configured — insecure defaults hide misconfiguration
+            String writeUrl = ConfigUtil.getProperty("db.url.write", ConfigUtil.getProperty("db.url", null));
+            if (writeUrl == null || writeUrl.isEmpty()) {
+                throw new ExceptionInInitializerError(
+                    "Database write URL is not configured. Set db.url or DB_URL environment variable.");
+            }
             writeDataSource = createDataSource(writeUrl, "WritePool");
             logger.info("Write connection pool initialized successfully with url: {}", writeUrl);
 

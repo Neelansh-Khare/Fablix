@@ -6,6 +6,7 @@ import com.neelanshkhare.fabflix.model.Customer;
 import com.neelanshkhare.fabflix.model.Order;
 import com.neelanshkhare.fabflix.model.OrderItem;
 import com.neelanshkhare.fabflix.service.CustomerService;
+import com.neelanshkhare.fabflix.util.CsrfUtil;
 import com.neelanshkhare.fabflix.util.RecaptchaUtil;
 import com.neelanshkhare.fabflix.util.RateLimiterUtil;
 import com.neelanshkhare.fabflix.util.PasswordPolicyUtil;
@@ -44,9 +45,8 @@ public class CustomerServlet extends HttpServlet {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
-        // Check if user is logged in
-        HttpSession session = request.getSession();
-        if (session.getAttribute("customerId") == null) {
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("customerId") == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             JSONObject error = new JSONObject();
             error.put("message", "Unauthorized access");
@@ -59,7 +59,6 @@ public class CustomerServlet extends HttpServlet {
 
         try {
             if (pathInfo == null || pathInfo.equals("/")) {
-                // Get current customer info
                 int customerId = (Integer) session.getAttribute("customerId");
                 Customer customer = customerService.getCustomer(customerId);
 
@@ -70,8 +69,6 @@ public class CustomerServlet extends HttpServlet {
                     customerObj.put("lastName", customer.getLastName());
                     customerObj.put("email", customer.getEmail());
                     customerObj.put("address", customer.getAddress());
-                    // Don't include sensitive data like password or credit card info
-
                     out.print(customerObj.toString());
                 } else {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -80,7 +77,6 @@ public class CustomerServlet extends HttpServlet {
                     out.print(error.toString());
                 }
             } else if (pathInfo.equals("/orders")) {
-                // Get order history for the current customer
                 int customerId = (Integer) session.getAttribute("customerId");
                 List<Order> orders = orderDAO.findByCustomer(customerId);
 
@@ -118,7 +114,7 @@ public class CustomerServlet extends HttpServlet {
             LOGGER.log(Level.SEVERE, "Error processing customer GET request", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }
@@ -147,7 +143,6 @@ public class CustomerServlet extends HttpServlet {
             JSONObject jsonRequest = new JSONObject(payload);
             String action = jsonRequest.getString("action");
 
-            // Check for reCAPTCHA
             if (!jsonRequest.has("recaptcha")) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 JSONObject error = new JSONObject();
@@ -157,14 +152,10 @@ public class CustomerServlet extends HttpServlet {
                 return;
             }
 
-            // Get recaptcha response
             String recaptchaResponse = jsonRequest.getString("recaptcha");
-
-            // Log for debugging
             LOGGER.info("Received reCAPTCHA response: " + (recaptchaResponse.length() > 20 ?
                     recaptchaResponse.substring(0, 20) + "..." : recaptchaResponse));
 
-            // Verify recaptcha
             boolean isRecaptchaValid = RecaptchaUtil.verifyRecaptcha(recaptchaResponse);
 
             if (!isRecaptchaValid) {
@@ -177,7 +168,6 @@ public class CustomerServlet extends HttpServlet {
             }
 
             if ("register".equals(action)) {
-                // Validate password against policy
                 String password = jsonRequest.getString("password");
                 if (!PasswordPolicyUtil.isValidPassword(password)) {
                     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -187,7 +177,6 @@ public class CustomerServlet extends HttpServlet {
                     return;
                 }
 
-                // Process customer registration
                 Customer customer = new Customer();
                 customer.setFirstName(jsonRequest.getString("firstName"));
                 customer.setLastName(jsonRequest.getString("lastName"));
@@ -196,7 +185,6 @@ public class CustomerServlet extends HttpServlet {
                 customer.setAddress(jsonRequest.getString("address"));
                 customer.setCcId(jsonRequest.getString("ccId"));
 
-                // Check if email already exists
                 Customer existingCustomer = customerService.getCustomerByEmail(customer.getEmail());
                 if (existingCustomer != null) {
                     response.setStatus(HttpServletResponse.SC_CONFLICT);
@@ -214,29 +202,24 @@ public class CustomerServlet extends HttpServlet {
                     result.put("message", "Registration successful");
                     result.put("id", customer.getId());
                     out.print(result.toString());
-
                     LOGGER.log(Level.INFO, "New customer registered: " + customer.getEmail());
                 } else {
                     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                     JSONObject error = new JSONObject();
                     error.put("message", "Registration failed");
                     out.print(error.toString());
-
                     LOGGER.log(Level.WARNING, "Failed to register customer: " + customer.getEmail());
                 }
             } else if ("login".equals(action)) {
-                // Process customer login
                 String email = jsonRequest.getString("email");
                 String password = jsonRequest.getString("password");
 
-                // Apply rate limiting
                 String ipAddress = request.getRemoteAddr();
                 if (!RateLimiterUtil.allowRequest(ipAddress)) {
                     response.setStatus(429);
                     JSONObject error = new JSONObject();
                     error.put("message", "Too many login attempts. Please try again later.");
                     out.print(error.toString());
-
                     LOGGER.log(Level.WARNING, "Rate limit exceeded for IP: " + ipAddress);
                     return;
                 }
@@ -244,36 +227,37 @@ public class CustomerServlet extends HttpServlet {
                 boolean isValid = customerService.login(email, password);
 
                 if (isValid) {
-                    // Get customer details
                     Customer customer = customerService.getCustomerByEmail(email);
 
-                    // Create session
-                    HttpSession session = request.getSession();
+                    // Invalidate old session to prevent session fixation (C2)
+                    HttpSession oldSession = request.getSession(false);
+                    if (oldSession != null) {
+                        oldSession.invalidate();
+                    }
+                    HttpSession session = request.getSession(true);
                     session.setAttribute("customerId", customer.getId());
                     session.setAttribute("customerEmail", customer.getEmail());
                     session.setAttribute("customerName", customer.getFirstName() + " " + customer.getLastName());
                     session.setAttribute("customerRole", customer.getRole());
-
-                    // Set session timeout (30 minutes)
                     session.setMaxInactiveInterval(30 * 60);
 
-                    // Mark this IP as having a successful login
                     RateLimiterUtil.loginSucceeded(ipAddress);
 
-                    // Return success
+                    // Generate and return CSRF token so client can include it in future state-changing requests
+                    String csrfToken = CsrfUtil.getOrCreateToken(session);
+
                     JSONObject result = new JSONObject();
                     result.put("message", "Login successful");
                     result.put("id", customer.getId());
                     result.put("name", customer.getFirstName() + " " + customer.getLastName());
+                    result.put("csrfToken", csrfToken);
                     out.print(result.toString());
-
                     LOGGER.log(Level.INFO, "Customer logged in: " + customer.getEmail());
                 } else {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     JSONObject error = new JSONObject();
                     error.put("message", "Invalid credentials");
                     out.print(error.toString());
-
                     LOGGER.log(Level.WARNING, "Failed login attempt for email: " + email + " from IP: " + ipAddress);
                 }
             } else {
@@ -286,7 +270,7 @@ public class CustomerServlet extends HttpServlet {
             LOGGER.log(Level.SEVERE, "Error processing customer POST request", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }
@@ -298,12 +282,20 @@ public class CustomerServlet extends HttpServlet {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
-        // Check if user is logged in
-        HttpSession session = request.getSession();
-        if (session.getAttribute("customerId") == null) {
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("customerId") == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             JSONObject error = new JSONObject();
             error.put("message", "Unauthorized access");
+            response.getWriter().print(error.toString());
+            return;
+        }
+
+        // CSRF validation (H4)
+        if (!CsrfUtil.validateToken(request)) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            JSONObject error = new JSONObject();
+            error.put("message", "Invalid or missing CSRF token");
             response.getWriter().print(error.toString());
             return;
         }
@@ -324,16 +316,13 @@ public class CustomerServlet extends HttpServlet {
         try {
             JSONObject jsonRequest = new JSONObject(payload);
 
-            // Get customer ID from session
             int customerId = (Integer) session.getAttribute("customerId");
             Customer customer = customerService.getCustomer(customerId);
 
             if (customer != null) {
-                // Check if password update is requested
                 if (jsonRequest.has("password")) {
                     String newPassword = jsonRequest.getString("password");
 
-                    // Validate new password against policy
                     if (!PasswordPolicyUtil.isValidPassword(newPassword)) {
                         response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                         JSONObject error = new JSONObject();
@@ -342,7 +331,6 @@ public class CustomerServlet extends HttpServlet {
                         return;
                     }
 
-                    // Need to verify current password before allowing password change
                     if (!jsonRequest.has("currentPassword")) {
                         response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                         JSONObject error = new JSONObject();
@@ -363,15 +351,12 @@ public class CustomerServlet extends HttpServlet {
                     customer.setPassword(newPassword);
                 }
 
-                // Update other customer information
                 customer.setFirstName(jsonRequest.getString("firstName"));
                 customer.setLastName(jsonRequest.getString("lastName"));
                 customer.setAddress(jsonRequest.getString("address"));
 
-                // Check if email is being changed
                 String newEmail = jsonRequest.getString("email");
                 if (!newEmail.equals(customer.getEmail())) {
-                    // Check if the new email is already in use
                     Customer existingCustomer = customerService.getCustomerByEmail(newEmail);
                     if (existingCustomer != null) {
                         response.setStatus(HttpServletResponse.SC_CONFLICT);
@@ -383,7 +368,6 @@ public class CustomerServlet extends HttpServlet {
                 }
                 customer.setEmail(newEmail);
 
-                // Optional update of credit card
                 if (jsonRequest.has("ccId")) {
                     customer.setCcId(jsonRequest.getString("ccId"));
                 }
@@ -391,21 +375,18 @@ public class CustomerServlet extends HttpServlet {
                 boolean success = customerService.updateCustomer(customer);
 
                 if (success) {
-                    // Update session with new customer information
                     session.setAttribute("customerEmail", customer.getEmail());
                     session.setAttribute("customerName", customer.getFirstName() + " " + customer.getLastName());
 
                     JSONObject result = new JSONObject();
                     result.put("message", "Customer updated successfully");
                     out.print(result.toString());
-
                     LOGGER.log(Level.INFO, "Customer updated: " + customer.getEmail());
                 } else {
                     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                     JSONObject error = new JSONObject();
                     error.put("message", "Failed to update customer");
                     out.print(error.toString());
-
                     LOGGER.log(Level.WARNING, "Failed to update customer: " + customer.getEmail());
                 }
             } else {
@@ -418,7 +399,7 @@ public class CustomerServlet extends HttpServlet {
             LOGGER.log(Level.SEVERE, "Error processing customer PUT request", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }
@@ -430,9 +411,8 @@ public class CustomerServlet extends HttpServlet {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
-        // Check if user is logged in
-        HttpSession session = request.getSession();
-        if (session.getAttribute("customerId") == null) {
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("customerId") == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             JSONObject error = new JSONObject();
             error.put("message", "Unauthorized access");
@@ -440,13 +420,20 @@ public class CustomerServlet extends HttpServlet {
             return;
         }
 
+        // CSRF validation
+        if (!CsrfUtil.validateToken(request)) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            JSONObject error = new JSONObject();
+            error.put("message", "Invalid or missing CSRF token");
+            response.getWriter().print(error.toString());
+            return;
+        }
+
         PrintWriter out = response.getWriter();
 
         try {
-            // Get customer ID from session
             int customerId = (Integer) session.getAttribute("customerId");
 
-            // Require password confirmation for account deletion
             StringBuilder buffer = new StringBuilder();
             String line;
             try {
@@ -482,27 +469,23 @@ public class CustomerServlet extends HttpServlet {
             boolean success = customerService.deleteCustomer(customerId);
 
             if (success) {
-                // Invalidate session
                 session.invalidate();
-
                 JSONObject result = new JSONObject();
                 result.put("message", "Account deleted successfully");
                 out.print(result.toString());
-
                 LOGGER.log(Level.INFO, "Customer account deleted: " + email);
             } else {
                 response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 JSONObject error = new JSONObject();
                 error.put("message", "Failed to delete account");
                 out.print(error.toString());
-
                 LOGGER.log(Level.WARNING, "Failed to delete customer account: " + email);
             }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error processing customer DELETE request", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }

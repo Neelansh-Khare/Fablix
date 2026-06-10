@@ -63,6 +63,8 @@ public class SearchServlet extends HttpServlet {
             } catch (NumberFormatException e) {
                 logger.warn("Invalid pagination parameters, using defaults");
             }
+            page = Math.max(1, page);
+            pageSize = Math.min(Math.max(1, pageSize), 100);
 
             Integer yearVal = null;
             if (year != null && !year.isEmpty()) {
@@ -143,7 +145,7 @@ public class SearchServlet extends HttpServlet {
             logger.error("Error in doGet for SearchServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }

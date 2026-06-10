@@ -1,5 +1,9 @@
 // autocomplete.js - Intelligent search with autocomplete
 
+function escapeHtml(text) {
+    return $('<div>').text(text || '').html();
+}
+
 let autocompleteTimeout;
 let currentSuggestions = [];
 let selectedSuggestionIndex = -1;
@@ -151,8 +155,8 @@ function displayAutocompleteSuggestions(suggestions) {
             <div class="suggestion-content">
                 <span class="suggestion-icon">${icon}</span>
                 <div class="suggestion-text">
-                    <div class="suggestion-title">${suggestion.title}</div>
-                    <div class="suggestion-subtitle">${suggestion.subtitle}</div>
+                    <div class="suggestion-title">${escapeHtml(suggestion.title)}</div>
+                    <div class="suggestion-subtitle">${escapeHtml(suggestion.subtitle)}</div>
                 </div>
             </div>
         `);

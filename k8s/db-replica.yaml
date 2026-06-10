@@ -15,6 +15,32 @@ spec:
         app: fabflix-db
         role: replica
     spec:
+      initContainers:
+      - name: init-replica
+        image: postgres:15-alpine
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fabflix-secrets
+              key: db-password
+        command:
+        - /bin/sh
+        - -c
+        - |
+          until pg_isready -h db-primary -p 5432 -U postgres; do
+            echo "Waiting for primary to be ready..."; sleep 2;
+          done
+          if [ -z "$(ls -A /var/lib/postgresql/data)" ]; then
+            pg_basebackup -h db-primary -D /var/lib/postgresql/data \
+              -U postgres -Fp -Xs -P -R
+            echo "Replica initialized from primary via pg_basebackup"
+          else
+            echo "Data directory already populated, skipping pg_basebackup"
+          fi
+        volumeMounts:
+        - name: db-data
+          mountPath: /var/lib/postgresql/data
       containers:
       - name: postgres
         image: postgres:15-alpine
@@ -28,13 +54,28 @@ spec:
             secretKeyRef:
               name: fabflix-secrets
               key: db-password
-        # We would use a custom entrypoint here as well, similar to Docker Compose
-        # For K8s, it's often handled by a sidecar or a complex initContainer
         command: ["postgres"]
         args: ["-c", "hot_standby=on"]
         ports:
         - containerPort: 5432
           name: postgres
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres", "-d", "fabflix"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres", "-d", "fabflix"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
         volumeMounts:
         - name: db-data
           mountPath: /var/lib/postgresql/data

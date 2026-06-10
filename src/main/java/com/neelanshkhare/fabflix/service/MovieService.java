@@ -155,13 +155,13 @@ public class MovieService {
      * Determine if a movie needs a poster
      */
     private boolean shouldFetchPoster(Movie movie) {
-        // Don't fetch if already in cache (prevents duplicate requests)
-        if (posterFetchCache.containsKey(movie.getId())) {
+        // Don't fetch if API is not configured
+        if (!MoviePosterUtil.isApiKeyConfigured()) {
             return false;
         }
 
-        // Don't fetch if API is not configured
-        if (!MoviePosterUtil.isApiKeyConfigured()) {
+        // Already in cache means it's either fetched or being fetched
+        if (posterFetchCache.containsKey(movie.getId())) {
             return false;
         }
 
@@ -178,8 +178,10 @@ public class MovieService {
      * Fetch poster asynchronously to avoid blocking the main request
      */
     private void fetchPosterAsync(Movie movie) {
-        // Mark as being processed to prevent duplicate requests
-        posterFetchCache.put(movie.getId(), true);
+        // Atomic check-and-set: if another thread already claimed this movie, bail out
+        if (posterFetchCache.putIfAbsent(movie.getId(), true) != null) {
+            return;
+        }
 
         CompletableFuture.runAsync(() -> {
             try {

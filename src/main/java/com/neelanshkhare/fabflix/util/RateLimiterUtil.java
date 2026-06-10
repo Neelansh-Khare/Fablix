@@ -1,65 +1,103 @@
 package com.neelanshkhare.fabflix.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class RateLimiterUtil {
-    // Map to store IP addresses and their login attempt counts
-    private static final Map<String, LoginAttemptInfo> loginAttempts = new ConcurrentHashMap<>();
+    private static final Logger logger = LoggerFactory.getLogger(RateLimiterUtil.class);
 
-    // Maximum allowed attempts in the time window
     private static final int MAX_ATTEMPTS = 5;
+    private static final long TIME_WINDOW_MS = 5 * 60 * 1000L;
+    private static final int TIME_WINDOW_SECONDS = 5 * 60;
+    private static final int LOCKOUT_SECONDS = 15 * 60;
 
-    // Time window in milliseconds (5 minutes)
-    private static final long TIME_WINDOW = 5 * 60 * 1000;
+    // In-memory fallback used when Redis is unavailable
+    private static final Map<String, LoginAttemptInfo> loginAttempts = new ConcurrentHashMap<>();
+    private static volatile long lastCleanupTime = System.currentTimeMillis();
 
     public static boolean allowRequest(String ipAddress) {
-        long currentTime = System.currentTimeMillis();
+        if (RedisUtil.isRedisAvailable()) {
+            return allowRequestRedis(ipAddress);
+        }
+        cleanupIfNeeded();
+        return allowRequestInMemory(ipAddress);
+    }
 
-        // Get or create the login attempt info for this IP
+    private static boolean allowRequestRedis(String ipAddress) {
+        String lockKey = "lockout:" + ipAddress;
+        String countKey = "ratelimit:" + ipAddress;
+
+        // Check lockout first
+        if ("1".equals(RedisUtil.get(lockKey))) {
+            return false;
+        }
+
+        Long count = RedisUtil.increment(countKey);
+        if (count == null) {
+            // Redis returned null — fall back to in-memory
+            return allowRequestInMemory(ipAddress);
+        }
+        if (count == 1) {
+            RedisUtil.expire(countKey, TIME_WINDOW_SECONDS);
+        }
+        if (count >= MAX_ATTEMPTS) {
+            RedisUtil.set(lockKey, "1", LOCKOUT_SECONDS);
+            logger.warn("IP {} locked out after {} failed login attempts", ipAddress, MAX_ATTEMPTS);
+        }
+        return count <= MAX_ATTEMPTS;
+    }
+
+    private static boolean allowRequestInMemory(String ipAddress) {
+        long now = System.currentTimeMillis();
         LoginAttemptInfo info = loginAttempts.computeIfAbsent(ipAddress,
-                k -> new LoginAttemptInfo(currentTime, new AtomicInteger(0)));
+                k -> new LoginAttemptInfo(now, new AtomicInteger(0)));
 
-        // If the time window has passed, reset the counter
-        if (currentTime - info.getTimestamp() > TIME_WINDOW) {
-            info.setTimestamp(currentTime);
+        if (now - info.getTimestamp() > TIME_WINDOW_MS) {
+            info.setTimestamp(now);
             info.getAttemptCount().set(1);
             return true;
         }
-
-        // Increment the counter
-        int attemptCount = info.getAttemptCount().incrementAndGet();
-
-        // Check if the attempt count exceeds the max allowed
-        return attemptCount <= MAX_ATTEMPTS;
+        return info.getAttemptCount().incrementAndGet() <= MAX_ATTEMPTS;
     }
 
     public static void loginSucceeded(String ipAddress) {
-        // Reset the counter on successful login
-        loginAttempts.remove(ipAddress);
+        if (RedisUtil.isRedisAvailable()) {
+            RedisUtil.delete("ratelimit:" + ipAddress);
+            RedisUtil.delete("lockout:" + ipAddress);
+        } else {
+            loginAttempts.remove(ipAddress);
+        }
     }
 
-    // Inner class to store login attempt information
-    private static class LoginAttemptInfo {
-        private long timestamp;
-        private AtomicInteger attemptCount;
+    /** Evict expired in-memory entries to prevent unbounded map growth. */
+    private static void cleanupIfNeeded() {
+        long now = System.currentTimeMillis();
+        if (now - lastCleanupTime < TIME_WINDOW_MS) return;
+        lastCleanupTime = now;
+        Iterator<Map.Entry<String, LoginAttemptInfo>> it = loginAttempts.entrySet().iterator();
+        while (it.hasNext()) {
+            if (now - it.next().getValue().getTimestamp() > TIME_WINDOW_MS) {
+                it.remove();
+            }
+        }
+    }
 
-        public LoginAttemptInfo(long timestamp, AtomicInteger attemptCount) {
+    private static class LoginAttemptInfo {
+        private volatile long timestamp;
+        private final AtomicInteger attemptCount;
+
+        LoginAttemptInfo(long timestamp, AtomicInteger attemptCount) {
             this.timestamp = timestamp;
             this.attemptCount = attemptCount;
         }
 
-        public long getTimestamp() {
-            return timestamp;
-        }
-
-        public void setTimestamp(long timestamp) {
-            this.timestamp = timestamp;
-        }
-
-        public AtomicInteger getAttemptCount() {
-            return attemptCount;
-        }
+        long getTimestamp() { return timestamp; }
+        void setTimestamp(long t) { this.timestamp = t; }
+        AtomicInteger getAttemptCount() { return attemptCount; }
     }
 }

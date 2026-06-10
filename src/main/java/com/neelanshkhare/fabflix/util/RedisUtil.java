@@ -83,6 +83,7 @@ public class RedisUtil {
             logger.info("Redis Cluster initialized successfully with nodes: {}", REDIS_CLUSTER_NODES);
         } catch (Exception e) {
             logger.warn("Failed to initialize Redis Cluster. Redis caching disabled. Error: {}", e.getMessage());
+            logger.warn("APPLICATION DEGRADED: Redis is unavailable. Caching, distributed rate-limiting, and distributed sessions will not function. Restart the application when Redis recovers.");
             redisEnabled = false;
             if (jedisCluster != null) {
                 try { jedisCluster.close(); } catch (Exception ignore) {}

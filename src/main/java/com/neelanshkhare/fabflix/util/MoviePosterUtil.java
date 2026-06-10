@@ -114,39 +114,36 @@ public class MoviePosterUtil {
 
             // Make HTTP request with proper timeout and headers
             HttpURLConnection connection = createConnection(searchUrl);
-            int responseCode = connection.getResponseCode();
+            try {
+                int responseCode = connection.getResponseCode();
 
-            if (responseCode == 200) {
-                String responseBody = readResponse(connection);
-                MoviePosterResult result = parseSearchResponse(responseBody, movieTitle, year);
+                if (responseCode == 200) {
+                    String responseBody = readResponse(connection);
+                    MoviePosterResult result = parseSearchResponse(responseBody, movieTitle, year);
 
-                // Cache the result in Redis
-                if (result != null) {
-                    try {
-                        String jsonData = serializeToJson(result);
-                        RedisUtil.set(cacheKey, jsonData, RedisUtil.POSTER_TTL);
-                        LOGGER.debug("Cached poster data for: {}", movieTitle);
-                    } catch (Exception e) {
-                        LOGGER.error("Error caching poster data for: {}", movieTitle, e);
-                        // Continue even if caching fails
+                    if (result != null) {
+                        try {
+                            String jsonData = serializeToJson(result);
+                            RedisUtil.set(cacheKey, jsonData, RedisUtil.POSTER_TTL);
+                            LOGGER.debug("Cached poster data for: {}", movieTitle);
+                        } catch (Exception e) {
+                            LOGGER.error("Error caching poster data for: {}", movieTitle, e);
+                        }
                     }
+
+                    return result;
+
+                } else if (responseCode == 401) {
+                    LOGGER.error("TMDB API authentication failed - check your API key");
+                } else if (responseCode == 429) {
+                    LOGGER.warn("TMDB API rate limit exceeded - waiting before retry");
+                } else {
+                    LOGGER.warn("TMDB API request failed with code: {}", responseCode);
                 }
-
-                return result;
-
-            } else if (responseCode == 401) {
-                LOGGER.error("TMDB API authentication failed - check your API key");
-                return null;
-
-            } else if (responseCode == 429) {
-                LOGGER.warn("TMDB API rate limit exceeded - waiting before retry");
-                // Could implement exponential backoff here
-                return null;
-
-            } else {
-                LOGGER.warn("TMDB API request failed with code: {}", responseCode);
-                return null;
+            } finally {
+                connection.disconnect();
             }
+            return null;
 
         } catch (IOException e) {
             LOGGER.warn("IO error fetching movie poster from TMDB for: {}", movieTitle, e);
@@ -254,25 +251,27 @@ public class MoviePosterUtil {
             
             String videoUrl = String.format(TMDB_VIDEO_URL, tmdbId) + "?api_key=" + TMDB_API_KEY;
             HttpURLConnection connection = createConnection(videoUrl);
-            
-            if (connection.getResponseCode() == 200) {
-                String responseBody = readResponse(connection);
-                JSONObject jsonResponse = new JSONObject(responseBody);
-                JSONArray results = jsonResponse.getJSONArray("results");
-                
-                // Look for YouTube trailer
-                for (int i = 0; i < results.length(); i++) {
-                    JSONObject video = results.getJSONObject(i);
-                    String site = video.optString("site", "");
-                    String type = video.optString("type", "");
-                    
-                    if ("YouTube".equalsIgnoreCase(site) && "Trailer".equalsIgnoreCase(type)) {
-                        String key = video.optString("key");
-                        if (key != null && !key.isEmpty()) {
-                            return "https://www.youtube.com/embed/" + key;
+            try {
+                if (connection.getResponseCode() == 200) {
+                    String responseBody = readResponse(connection);
+                    JSONObject jsonResponse = new JSONObject(responseBody);
+                    JSONArray results = jsonResponse.getJSONArray("results");
+
+                    for (int i = 0; i < results.length(); i++) {
+                        JSONObject video = results.getJSONObject(i);
+                        String site = video.optString("site", "");
+                        String type = video.optString("type", "");
+
+                        if ("YouTube".equalsIgnoreCase(site) && "Trailer".equalsIgnoreCase(type)) {
+                            String key = video.optString("key");
+                            if (key != null && !key.isEmpty()) {
+                                return "https://www.youtube.com/embed/" + key;
+                            }
                         }
                     }
                 }
+            } finally {
+                connection.disconnect();
             }
         } catch (Exception e) {
             LOGGER.warn("Error fetching trailer for TMDB ID: {}", tmdbId, e);

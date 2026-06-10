@@ -7,6 +7,7 @@ import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.model.Order;
 import com.neelanshkhare.fabflix.model.OrderItem;
 import com.neelanshkhare.fabflix.service.MovieService;
+import com.neelanshkhare.fabflix.util.CsrfUtil;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,8 +56,17 @@ public class CheckoutServlet extends HttpServlet {
                 return;
             }
 
+            // CSRF validation
+            if (!CsrfUtil.validateToken(request)) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                JSONObject error = new JSONObject();
+                error.put("message", "Invalid or missing CSRF token");
+                out.print(error.toString());
+                return;
+            }
+
             int customerId = (int) session.getAttribute("customerId");
-            
+
             // Get Cart
             Cart cart = (Cart) session.getAttribute("cart");
             if (cart == null || cart.getTotalQuantity() == 0) {
@@ -123,7 +133,7 @@ public class CheckoutServlet extends HttpServlet {
             logger.error("Error during checkout", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error during checkout: " + e.getMessage());
+            error.put("message", "An unexpected error occurred during checkout. Please try again.");
             out.print(error.toString());
         }
     }

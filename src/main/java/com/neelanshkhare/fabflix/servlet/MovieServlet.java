@@ -59,6 +59,8 @@ public class MovieServlet extends HttpServlet {
                 } catch (NumberFormatException e) {
                     logger.warn("Invalid pagination parameters, using defaults", e);
                 }
+                page = Math.max(1, page);
+                pageSize = Math.min(Math.max(1, pageSize), 100);
 
                 List<Movie> movies = movieService.listMovies(page, pageSize);
                 int totalCount = movieService.getTotalMoviesCount();
@@ -110,6 +112,13 @@ public class MovieServlet extends HttpServlet {
             } else {
                 // Get a single movie by ID
                 String movieId = pathInfo.substring(1);
+                if (!movieId.matches("[a-zA-Z0-9_\\-]{1,50}")) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    JSONObject error = new JSONObject();
+                    error.put("message", "Invalid movie ID format");
+                    out.print(error.toString());
+                    return;
+                }
                 Movie movie = movieService.getMovie(movieId);
 
                 if (movie != null) {
@@ -181,7 +190,7 @@ public class MovieServlet extends HttpServlet {
             logger.error("Error in doGet for MovieServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }
@@ -266,7 +275,7 @@ public class MovieServlet extends HttpServlet {
             logger.error("Error in doPost for MovieServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }
@@ -290,6 +299,13 @@ public class MovieServlet extends HttpServlet {
         }
 
         String movieId = pathInfo.substring(1);
+        if (!movieId.matches("[a-zA-Z0-9_\\-]{1,50}")) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            JSONObject error = new JSONObject();
+            error.put("message", "Invalid movie ID format");
+            out.print(error.toString());
+            return;
+        }
         StringBuilder buffer = new StringBuilder();
         String line;
         try (java.io.BufferedReader reader = request.getReader()) {
@@ -359,7 +375,7 @@ public class MovieServlet extends HttpServlet {
             logger.error("Error in doPut for MovieServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }
@@ -383,6 +399,13 @@ public class MovieServlet extends HttpServlet {
         }
 
         String movieId = pathInfo.substring(1);
+        if (!movieId.matches("[a-zA-Z0-9_\\-]{1,50}")) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            JSONObject error = new JSONObject();
+            error.put("message", "Invalid movie ID format");
+            out.print(error.toString());
+            return;
+        }
 
         try {
             boolean success = movieService.deleteMovie(movieId);
@@ -402,7 +425,7 @@ public class MovieServlet extends HttpServlet {
             logger.error("Error in doDelete for MovieServlet", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             JSONObject error = new JSONObject();
-            error.put("message", "Internal server error: " + e.getMessage());
+            error.put("message", "An unexpected error occurred. Please try again.");
             out.print(error.toString());
         }
     }

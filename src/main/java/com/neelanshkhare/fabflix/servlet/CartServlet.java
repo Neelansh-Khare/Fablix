@@ -3,6 +3,7 @@ package com.neelanshkhare.fabflix.servlet;
 import com.neelanshkhare.fabflix.model.Cart;
 import com.neelanshkhare.fabflix.model.Movie;
 import com.neelanshkhare.fabflix.service.MovieService;
+import com.neelanshkhare.fabflix.util.CsrfUtil;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -99,6 +100,12 @@ public class CartServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
 
         try {
+            if (!CsrfUtil.validateToken(request)) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                out.print(new JSONObject().put("message", "Invalid or missing CSRF token").toString());
+                return;
+            }
+
             String movieId = request.getParameter("movieId");
             String quantityStr = request.getParameter("quantity");
             String action = request.getParameter("action"); // 'add', 'update', 'remove', 'clear'
@@ -130,6 +137,11 @@ public class CartServlet extends HttpServlet {
                     } catch (NumberFormatException e) {
                         // ignore, use default 1
                     }
+                }
+                if (quantity < 1 || quantity > 99) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    out.print(new JSONObject().put("message", "Quantity must be between 1 and 99").toString());
+                    return;
                 }
 
                 if ("update".equals(action)) {
