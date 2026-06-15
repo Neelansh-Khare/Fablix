@@ -1,13 +1,11 @@
 package com.neelanshkhare.fabflix.model;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Represents a shopping cart in the session.
- * Stores movie IDs and their quantities.
- */
-public class Cart {
+public class Cart implements Serializable {
+    private static final long serialVersionUID = 1L;
     // Map of Movie ID -> Quantity
     private Map<String, Integer> items;
 
