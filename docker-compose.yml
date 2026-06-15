@@ -35,7 +35,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     volumes:
-      - ./sql/init-replica.sh:/usr/local/bin/init-replica.sh
+      - ./scripts/init-replica.sh:/usr/local/bin/init-replica.sh
     entrypoint: ["/bin/sh", "/usr/local/bin/init-replica.sh"]
     ports:
       - "5433:5432"

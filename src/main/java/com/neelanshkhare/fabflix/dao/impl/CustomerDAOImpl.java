@@ -171,8 +171,16 @@ public class CustomerDAOImpl implements CustomerDAO {
                     int userId = rs.getInt("id");
 
                     if (salt == null || salt.isEmpty()) {
-                        // Use BCrypt check
-                        isValid = SecurityUtil.checkPassword(password, storedPassword);
+                        if (storedPassword != null && storedPassword.startsWith("$2")) {
+                            // BCrypt hash
+                            isValid = SecurityUtil.checkPassword(password, storedPassword);
+                        } else {
+                            // Plaintext legacy data — compare directly and upgrade
+                            isValid = password.equals(storedPassword);
+                            if (isValid) {
+                                upgradePassword(userId, password);
+                            }
+                        }
                     } else {
                         // Legacy SHA-256 check
                         String hashedPassword = SecurityUtil.hashPassword(password, salt);
