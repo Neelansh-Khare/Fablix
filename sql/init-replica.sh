@@ -1,4 +1,3 @@
-
 #!/bin/bash
 set -e
 
@@ -18,10 +17,10 @@ if [ -z "$(ls -A /var/lib/postgresql/data)" ]; then
         -D /var/lib/postgresql/data \
         -U replicator \
         -vP -R --slot=replica_slot
-    
+
     # Ensure correct permissions
     chmod 700 /var/lib/postgresql/data
-    
+
     echo "Replica initialized successfully."
 else
     echo "Data directory not empty, skipping initialization."

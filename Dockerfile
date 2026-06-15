@@ -29,6 +29,13 @@ COPY conf/server.xml /usr/local/tomcat/conf/server.xml
 # Copy the built war file
 COPY --from=build /app/target/fabflix.war /usr/local/tomcat/webapps/fabflix.war
 
+# RedissonSessionManager must be on Tomcat's classloader (not the webapp's WEB-INF/lib)
+RUN mkdir -p /tmp/war-extract && \
+    cd /tmp/war-extract && \
+    jar xf /usr/local/tomcat/webapps/fabflix.war WEB-INF/lib && \
+    cp WEB-INF/lib/*.jar /usr/local/tomcat/lib/ && \
+    rm -rf /tmp/war-extract
+
 # Expose HTTP and HTTPS ports
 EXPOSE 8080
 EXPOSE 8443

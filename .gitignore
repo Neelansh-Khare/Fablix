@@ -102,3 +102,4 @@ logs/
 *.db
 *.sqlite
 *.h2.db
+.env
