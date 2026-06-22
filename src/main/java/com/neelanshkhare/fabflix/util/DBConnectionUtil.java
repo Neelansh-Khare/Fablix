@@ -56,6 +56,7 @@ public class DBConnectionUtil {
         // Pool settings
         config.setMinimumIdle(minConnections);
         config.setMaximumPoolSize(maxConnections);
+        config.setInitializationFailTimeout(-1); // Don't fail at startup if DB isn't ready yet
         
         // Optimization settings
         config.addDataSourceProperty("cachePrepStmts", "true");

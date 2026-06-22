@@ -67,8 +67,7 @@ CREATE TABLE customers (
     cc_id VARCHAR(20) NOT NULL,
     address VARCHAR(200) NOT NULL,
     email VARCHAR(50) NOT NULL UNIQUE,
-    password VARCHAR(200) NOT NULL, -- Increased length for hashed passwords
-    salt VARCHAR(32) DEFAULT NULL,    -- For password security
+    password VARCHAR(200) NOT NULL,
     FOREIGN KEY (cc_id) REFERENCES creditcards(id)
 );
 

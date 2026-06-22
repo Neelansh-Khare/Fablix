@@ -78,12 +78,13 @@ function checkLoginStatus() {
         success: function(response) {
             if (response.loggedIn) {
                 // User is logged in
+                window.csrfToken = response.csrfToken;
                 $('#login-section').hide();
                 $('#account-section').show();
                 $('#account-link').text(response.name);
                 
-                // Add poster admin link if user is logged in
-                if (typeof addPosterAdminLink === 'function') {
+                // Add poster admin link for admins only
+                if (response.role === 'admin' && typeof addPosterAdminLink === 'function') {
                     addPosterAdminLink();
                 }
 

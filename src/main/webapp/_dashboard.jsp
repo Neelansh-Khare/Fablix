@@ -301,12 +301,12 @@
                 
                 if (response.popularSearches && response.popularSearches.length > 0) {
                     response.popularSearches.forEach((search, index) => {
-                        list.append(`
-                            <div class="search-item">
-                                <div><span class="rank">#${index + 1}</span> ${escapeHtml(search.query)}</div>
-                                <div style="color: #666;">${search.score} searches</div>
-                            </div>
-                        `);
+                        list.append(
+                            '<div class="search-item">' +
+                            '<div><span class="rank">#' + (index + 1) + '</span> ' + escapeHtml(search.query) + '</div>' +
+                            '<div style="color: #666;">' + search.score + ' searches</div>' +
+                            '</div>'
+                        );
                     });
                 } else {
                     list.append('<p>No search data available yet.</p>');

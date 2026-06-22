@@ -1,5 +1,6 @@
 package com.neelanshkhare.fabflix.servlet;
 
+import com.neelanshkhare.fabflix.util.CsrfUtil;
 import org.json.JSONObject;
 
 import javax.servlet.ServletException;
@@ -36,6 +37,7 @@ public class AuthServlet extends HttpServlet {
                 if (session.getAttribute("customerRole") != null) {
                     result.put("role", session.getAttribute("customerRole"));
                 }
+                result.put("csrfToken", CsrfUtil.getOrCreateToken(session));
             } else {
                 result.put("loggedIn", false);
             }
