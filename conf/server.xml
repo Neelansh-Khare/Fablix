@@ -27,7 +27,7 @@
                keystoreFile="conf/keystore.jks"
                keystorePass="password" />
 
-    <Engine name="Catalina" defaultHost="localhost">
+    <Engine name="Catalina" defaultHost="localhost" jvmRoute="${jvmRoute}">
       <Realm className="org.apache.catalina.realm.LockOutRealm">
         <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
                resourceName="UserDatabase"/>

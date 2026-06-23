@@ -131,6 +131,8 @@ services:
       DB_PASSWORD: password
       TMDB_API_KEY: ${TMDB_API_KEY}
       RECAPTCHA_SECRET: ${RECAPTCHA_SECRET}
+      JVM_ROUTE: app1
+      CATALINA_OPTS: -DjvmRoute=app1
     depends_on:
       db-primary:
         condition: service_healthy
@@ -150,6 +152,8 @@ services:
       DB_PASSWORD: password
       TMDB_API_KEY: ${TMDB_API_KEY}
       RECAPTCHA_SECRET: ${RECAPTCHA_SECRET}
+      JVM_ROUTE: app2
+      CATALINA_OPTS: -DjvmRoute=app2
     depends_on:
       db-primary:
         condition: service_healthy
