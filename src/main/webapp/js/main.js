@@ -157,15 +157,13 @@ function isPosterPending(movie) {
     return false;
 }
 
-// Enhanced displayMovies with better debugging
-function displayMovies(movies) {
+function displayMovies(movies, header) {
     const container = $('#content-container');
     container.empty();
 
-    // Add header
     container.append(`
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2>Featured Movies</h2>
+            <h2>${header || 'Featured Movies'}</h2>
         </div>
     `);
 
@@ -945,9 +943,75 @@ $(document).ready(function() {
     updateCartCount();
 });
 
-// Rest of the existing functions remain the same...
+// Browse pagination state
+let browseState = {
+    type: null,   // 'letter' or 'genre'
+    value: null,  // the letter or genre ID
+    label: null,  // display label
+    page: 1,
+    pageSize: 10
+};
+
+function loadBrowseResults(page) {
+    browseState.page = page;
+    const data = { page: page, pageSize: browseState.pageSize };
+
+    if (browseState.type === 'letter') {
+        data.title = browseState.value + '%';
+    } else {
+        data.genre = browseState.value;
+    }
+
+    $.ajax({
+        url: 'api/search',
+        method: 'GET',
+        data: data,
+        success: function(response) {
+            if (response.movies.length === 0 && page === 1) {
+                showInfoMessage(`No movies found for "${browseState.label}".`);
+                return;
+            }
+            displayMovies(response.movies, browseState.label);
+            renderPaginationControls(response.currentPage, response.totalPages);
+        },
+        error: function() {
+            showErrorMessage('Error loading movies. Please try again.');
+        }
+    });
+}
+
+function renderPaginationControls(currentPage, totalPages) {
+    if (!totalPages || totalPages <= 1) return;
+
+    const paginationDiv = $('<div class="pagination-controls"></div>');
+
+    if (currentPage > 1) {
+        paginationDiv.append(`<button class="btn btn-sm page-btn" data-page="${currentPage - 1}">&laquo; Prev</button>`);
+    }
+
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+
+    for (let p = start; p <= end; p++) {
+        const cls = p === currentPage ? 'btn btn-sm page-btn active' : 'btn btn-sm page-btn';
+        paginationDiv.append(`<button class="${cls}" data-page="${p}">${p}</button>`);
+    }
+
+    if (currentPage < totalPages) {
+        paginationDiv.append(`<button class="btn btn-sm page-btn" data-page="${currentPage + 1}">Next &raquo;</button>`);
+    }
+
+    paginationDiv.append(`<span class="page-info">Page ${currentPage} of ${totalPages}</span>`);
+
+    $('#content-container').append(paginationDiv);
+
+    $('.page-btn').click(function() {
+        loadBrowseResults(parseInt($(this).data('page')));
+        window.scrollTo(0, 0);
+    });
+}
+
 function loadBrowsePage() {
-    // Fetch all genres
     $.ajax({
         url: 'api/genres',
         method: 'GET',
@@ -964,10 +1028,8 @@ function displayBrowseOptions(genres) {
     const container = $('#content-container');
     container.empty();
 
-    // Add header
     container.append(`<h2>Browse Movies</h2>`);
 
-    // Add browse by letter section
     const alphabetSection = $('<div class="browse-section"></div>');
     alphabetSection.append(`<h3>Browse by Title</h3>`);
 
@@ -978,67 +1040,29 @@ function displayBrowseOptions(genres) {
     alphabetSection.append(alphabetList);
     container.append(alphabetSection);
 
-    // Add browse by genre section
     const genreSection = $('<div class="browse-section"></div>');
     genreSection.append(`<h3>Browse by Genre</h3>`);
 
     const genreList = $('<div class="genre-list"></div>');
     genres.forEach(function(genre) {
-        genreList.append(`<a href="#" class="genre-link" data-id="${genre.id}">${genre.name}</a>`);
+        genreList.append(`<a href="#" class="genre-link" data-id="${genre.id}" data-name="${genre.name}">${genre.name}</a>`);
     });
     genreSection.append(genreList);
     container.append(genreSection);
 
-    // Event listeners for browse links
     $('.letter-link').click(function(e) {
         e.preventDefault();
         const letter = $(this).data('letter');
-
-        $.ajax({
-            url: 'api/search',
-            method: 'GET',
-            data: {
-                title: letter + '%'
-            },
-            success: function(response) {
-                if (response.movies.length === 0) {
-                    showInfoMessage(`No movies found starting with "${letter}".`);
-                } else {
-                    $('#content-container').empty()
-                        .append(`<h2>Movies Starting with "${letter}"</h2>`);
-                    displayMovies(response.movies);
-                }
-            },
-            error: function() {
-                showErrorMessage('Error browsing by letter. Please try again.');
-            }
-        });
+        browseState = { type: 'letter', value: letter, label: `Movies Starting with "${letter}"`, page: 1, pageSize: 10 };
+        loadBrowseResults(1);
     });
 
     $('.genre-link').click(function(e) {
         e.preventDefault();
         const genreId = $(this).data('id');
-        const genreName = $(this).text();
-
-        $.ajax({
-            url: 'api/search',
-            method: 'GET',
-            data: {
-                genre: genreId
-            },
-            success: function(response) {
-                if (response.movies.length === 0) {
-                    showInfoMessage(`No movies found in the "${genreName}" genre.`);
-                } else {
-                    $('#content-container').empty()
-                        .append(`<h2>${genreName} Movies</h2>`);
-                    displayMovies(response.movies);
-                }
-            },
-            error: function() {
-                showErrorMessage('Error browsing by genre. Please try again.');
-            }
-        });
+        const genreName = $(this).data('name');
+        browseState = { type: 'genre', value: genreId, label: `${genreName} Movies`, page: 1, pageSize: 10 };
+        loadBrowseResults(1);
     });
 }
 
@@ -1485,6 +1509,46 @@ $('<style>')
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        /* Pagination */
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 30px 0 10px;
+            flex-wrap: wrap;
+        }
+
+        .pagination-controls .page-btn {
+            min-width: 38px;
+            padding: 6px 10px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #333;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .pagination-controls .page-btn:hover {
+            background: #e74c3c;
+            color: white;
+            border-color: #e74c3c;
+        }
+
+        .pagination-controls .page-btn.active {
+            background: #e74c3c;
+            color: white;
+            border-color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .pagination-controls .page-info {
+            font-size: 0.85em;
+            color: #777;
+            margin-left: 10px;
         }
 
         /* Rating Styles */

@@ -112,8 +112,11 @@ public class CartServlet extends HttpServlet {
 
             Cart cart = getCartFromSession(request);
 
+            HttpSession session = request.getSession(false);
+
             if ("clear".equals(action)) {
                 cart.clear();
+                session.setAttribute("cart", cart);
                 JSONObject result = new JSONObject();
                 result.put("message", "Cart cleared");
                 result.put("count", 0);
@@ -147,10 +150,12 @@ public class CartServlet extends HttpServlet {
                 if ("update".equals(action)) {
                     cart.updateItem(movieId, quantity);
                 } else {
-                    // Default to add
                     cart.addItem(movieId, quantity);
                 }
             }
+
+            // Persist modified cart back to Redis session
+            session.setAttribute("cart", cart);
 
             JSONObject result = new JSONObject();
             result.put("message", "Cart updated");
