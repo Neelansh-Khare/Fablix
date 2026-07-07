@@ -102,6 +102,14 @@ public class MovieService {
         return movieDAO.getMoviesWithoutPosters(limit);
     }
 
+    public List<Movie> getAllMoviesWithoutPosters() {
+        return movieDAO.getAllMoviesWithoutPosters();
+    }
+
+    public boolean updateMoviePosterFields(String movieId, String bannerUrl, String trailerUrl, double rating, int numVotes) {
+        return movieDAO.updatePosterFields(movieId, bannerUrl, trailerUrl, rating, numVotes);
+    }
+
     public int getTotalMoviesCount() {
         return movieDAO.countMovies();
     }
@@ -193,21 +201,13 @@ public class MovieService {
                 );
 
                 if (posterResult != null && posterResult.getPosterUrl() != null) {
-                    // Update movie with new poster URL
-                    movie.setBannerUrl(posterResult.getPosterUrl());
-
-                    // Update trailer if available
-                    if (posterResult.getTrailerUrl() != null && !posterResult.getTrailerUrl().isEmpty()) {
-                        movie.setTrailerUrl(posterResult.getTrailerUrl());
-                    }
-
-                    // Update ratings and votes from TMDB
-                    movie.setRating(posterResult.getRating());
-                    movie.setNumVotes(posterResult.getNumVotes());
-
-                    // Save to database
-                    boolean updated = movieDAO.update(movie);
-
+                    boolean updated = movieDAO.updatePosterFields(
+                        movie.getId(),
+                        posterResult.getPosterUrl(),
+                        posterResult.getTrailerUrl(),
+                        posterResult.getRating(),
+                        posterResult.getNumVotes()
+                    );
                     if (updated) {
                         LOGGER.info("Successfully updated poster for: " + movie.getTitle());
                     } else {
@@ -215,9 +215,7 @@ public class MovieService {
                     }
                 } else {
                     LOGGER.info("No poster found for: " + movie.getTitle());
-                    // Mark as not found to prevent infinite retries
-                    movie.setBannerUrl("poster_not_found");
-                    movieDAO.update(movie);
+                    movieDAO.updatePosterFields(movie.getId(), "poster_not_found", null, 0.0, 0);
                 }
 
             } catch (Exception e) {
@@ -245,13 +243,13 @@ public class MovieService {
             );
 
             if (posterResult != null && posterResult.getPosterUrl() != null) {
-                movie.setBannerUrl(posterResult.getPosterUrl());
-
-                if (posterResult.getTrailerUrl() != null) {
-                    movie.setTrailerUrl(posterResult.getTrailerUrl());
-                }
-
-                return movieDAO.update(movie);
+                return movieDAO.updatePosterFields(
+                    movieId,
+                    posterResult.getPosterUrl(),
+                    posterResult.getTrailerUrl(),
+                    posterResult.getRating(),
+                    posterResult.getNumVotes()
+                );
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error refreshing poster for " + movie.getTitle(), e);

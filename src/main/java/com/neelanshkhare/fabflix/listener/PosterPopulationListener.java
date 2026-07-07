@@ -1,7 +1,10 @@
 package com.neelanshkhare.fabflix.listener;
 
 import com.neelanshkhare.fabflix.model.Movie;
+import com.neelanshkhare.fabflix.model.Star;
 import com.neelanshkhare.fabflix.service.MovieService;
+import com.neelanshkhare.fabflix.service.StarService;
+import com.neelanshkhare.fabflix.service.TmdbIngestService;
 import com.neelanshkhare.fabflix.util.MoviePosterUtil;
 import com.neelanshkhare.fabflix.util.MoviePosterUtil.MoviePosterResult;
 
@@ -17,32 +20,30 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * ServletContextListener that automatically populates movie posters on application startup.
+ * On startup (after a short delay) and every PERIODIC_HOURS hours:
+ *   1. Pull posters for any movies in the DB that don't have one.
+ *   2. Pull profile photos for any actors that don't have one.
+ *   3. Ingest new movies from TMDB discover (with posters + cast inline).
  *
- * Features:
- * - Scans for movies without posters on startup
- * - Asynchronously fetches posters from TMDB (respecting rate limits)
- * - Optional periodic check for new movies without posters
- * - Graceful shutdown handling
+ * New movies ingested via TMDB already have their poster set, so they skip
+ * step 1 on subsequent runs.
  */
 @WebListener
 public class PosterPopulationListener implements ServletContextListener {
 
     private static final Logger LOGGER = Logger.getLogger(PosterPopulationListener.class.getName());
 
-    // Configuration
-    private static final int STARTUP_DELAY_SECONDS = 10;      // Wait for app to fully initialize
-    private static final int BATCH_SIZE = 50;                  // Movies to process per batch
-    private static final int DELAY_BETWEEN_REQUESTS_MS = 300;  // Respect TMDB rate limit (40 req/10 sec)
-    private static final int PERIODIC_CHECK_HOURS = 6;         // Check for new movies every N hours
-    private static final boolean ENABLE_PERIODIC_CHECK = true;
+    private static final int STARTUP_DELAY_SECONDS = 10;
+    private static final int PERIODIC_HOURS = 6;
+    private static final int DELAY_BETWEEN_REQUESTS_MS = 300;
+    private static final int DISCOVER_PAGES = 5; // 100 movies per run
 
     private ScheduledExecutorService scheduler;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
-        LOGGER.info("PosterPopulationListener initialized - scheduling poster population task");
+        LOGGER.info("PosterPopulationListener initializing");
 
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "PosterPopulation-Thread");
@@ -50,152 +51,132 @@ public class PosterPopulationListener implements ServletContextListener {
             return t;
         });
 
-        // Schedule initial run after startup delay
-        scheduler.schedule(this::populatePosters, STARTUP_DELAY_SECONDS, TimeUnit.SECONDS);
+        scheduler.schedule(this::runAll, STARTUP_DELAY_SECONDS, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::runAll, PERIODIC_HOURS, PERIODIC_HOURS, TimeUnit.HOURS);
 
-        // Schedule periodic checks if enabled
-        if (ENABLE_PERIODIC_CHECK) {
-            scheduler.scheduleAtFixedRate(
-                this::populatePosters,
-                PERIODIC_CHECK_HOURS,
-                PERIODIC_CHECK_HOURS,
-                TimeUnit.HOURS
-            );
-            LOGGER.info("Periodic poster check scheduled every " + PERIODIC_CHECK_HOURS + " hours");
-        }
+        LOGGER.info("Poster population scheduled every " + PERIODIC_HOURS + " hours");
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-        LOGGER.info("PosterPopulationListener shutting down");
-
         if (scheduler != null) {
             scheduler.shutdown();
             try {
                 if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
                     scheduler.shutdownNow();
-                    LOGGER.warning("Poster population scheduler forced shutdown");
                 }
             } catch (InterruptedException e) {
                 scheduler.shutdownNow();
                 Thread.currentThread().interrupt();
             }
         }
-
-        // Also shutdown MovieService's executor
         MovieService.shutdown();
-
-        LOGGER.info("PosterPopulationListener shutdown complete");
+        LOGGER.info("PosterPopulationListener stopped");
     }
 
-    /**
-     * Main poster population logic - runs asynchronously
-     */
-    private void populatePosters() {
-        // Prevent concurrent runs
+    private void runAll() {
         if (!isRunning.compareAndSet(false, true)) {
-            LOGGER.info("Poster population already in progress, skipping");
+            LOGGER.info("Poster population already running, skipping");
             return;
         }
-
         try {
-            LOGGER.info("Starting poster population task");
-
-            // Check if TMDB API is configured
             if (!MoviePosterUtil.isApiKeyConfigured()) {
-                LOGGER.warning("TMDB API key not configured - skipping poster population");
+                LOGGER.warning("TMDB API key not configured — skipping all poster tasks");
                 return;
             }
-
-            // Test API connection
-            if (!MoviePosterUtil.testApiConnection()) {
-                LOGGER.warning("TMDB API connection test failed - skipping poster population");
-                return;
-            }
-
-            MovieService movieService = new MovieService();
-            int totalUpdated = 0;
-            int totalErrors = 0;
-            int totalProcessed = 0;
-
-            // Process in batches
-            List<Movie> moviesWithoutPosters;
-            do {
-                moviesWithoutPosters = movieService.getMoviesWithoutPosters(BATCH_SIZE);
-
-                if (moviesWithoutPosters.isEmpty()) {
-                    LOGGER.info("No movies without posters found");
-                    break;
-                }
-
-                LOGGER.info("Processing batch of " + moviesWithoutPosters.size() + " movies without posters");
-
-                for (Movie movie : moviesWithoutPosters) {
-                    totalProcessed++;
-
-                    try {
-                        boolean updated = updateMoviePoster(movie, movieService);
-                        if (updated) {
-                            totalUpdated++;
-                            LOGGER.fine("Updated poster for: " + movie.getTitle() + " (" + movie.getYear() + ")");
-                        }
-                    } catch (Exception e) {
-                        totalErrors++;
-                        LOGGER.log(Level.WARNING, "Error updating poster for: " + movie.getTitle(), e);
-                    }
-
-                    // Rate limiting - respect TMDB API limits
-                    Thread.sleep(DELAY_BETWEEN_REQUESTS_MS);
-                }
-
-                // Log progress after each batch
-                LOGGER.info("Progress: " + totalProcessed + " processed, " +
-                           totalUpdated + " updated, " + totalErrors + " errors");
-
-            } while (!moviesWithoutPosters.isEmpty() && moviesWithoutPosters.size() == BATCH_SIZE);
-
-            LOGGER.info("Poster population complete: " + totalProcessed + " processed, " +
-                       totalUpdated + " updated, " + totalErrors + " errors");
-
-        } catch (InterruptedException e) {
-            LOGGER.info("Poster population interrupted");
-            Thread.currentThread().interrupt();
+            populateMoviePosters();
+            populateActorPhotos();
+            ingestNewMovies();
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Unexpected error during poster population", e);
+            LOGGER.log(Level.SEVERE, "Unexpected error during poster population run", e);
         } finally {
             isRunning.set(false);
         }
     }
 
-    /**
-     * Update a single movie's poster from TMDB
-     */
-    private boolean updateMoviePoster(Movie movie, MovieService movieService) {
-        MoviePosterResult result = MoviePosterUtil.searchMoviePoster(
-            movie.getTitle(),
-            movie.getYear()
-        );
+    // ------------------------------------------------------------------
+    // Step 1: posters for movies already in DB
+    // ------------------------------------------------------------------
 
-        if (result == null || result.getPosterUrl() == null) {
-            // Mark as not found to prevent future retries
-            movie.setBannerUrl("poster_not_found");
-            movieService.updateMovie(movie);
-            return false;
+    private void populateMoviePosters() throws InterruptedException {
+        MovieService movieService = new MovieService();
+        List<Movie> movies = movieService.getAllMoviesWithoutPosters();
+
+        if (movies.isEmpty()) {
+            LOGGER.info("All movies already have posters");
+            return;
         }
 
-        // Update poster URL
-        movie.setBannerUrl(result.getPosterUrl());
+        LOGGER.info("Fetching posters for " + movies.size() + " movies");
+        int updated = 0, errors = 0;
 
-        // Update trailer if available and not already set
-        String trailerUrl = movie.getTrailerUrl();
-        if ((trailerUrl == null || trailerUrl.isEmpty()) && result.getTrailerUrl() != null) {
-            movie.setTrailerUrl(result.getTrailerUrl());
+        for (Movie movie : movies) {
+            try {
+                MoviePosterResult result = MoviePosterUtil.searchMoviePoster(movie.getTitle(), movie.getYear());
+                if (result != null && result.getPosterUrl() != null) {
+                    movieService.updateMoviePosterFields(
+                        movie.getId(),
+                        result.getPosterUrl(),
+                        result.getTrailerUrl(),
+                        result.getRating(),
+                        result.getNumVotes()
+                    );
+                    updated++;
+                } else {
+                    movieService.updateMoviePosterFields(movie.getId(), "poster_not_found", null, 0.0, 0);
+                }
+            } catch (Exception e) {
+                errors++;
+                LOGGER.log(Level.WARNING, "Error updating poster for: " + movie.getTitle(), e);
+            }
+            Thread.sleep(DELAY_BETWEEN_REQUESTS_MS);
         }
 
-        // Update ratings and votes
-        movie.setRating(result.getRating());
-        movie.setNumVotes(result.getNumVotes());
+        LOGGER.info("Movie posters: " + updated + " updated, " + errors + " errors");
+    }
 
-        return movieService.updateMovie(movie);
+    // ------------------------------------------------------------------
+    // Step 2: profile photos for actors already in DB
+    // ------------------------------------------------------------------
+
+    private void populateActorPhotos() throws InterruptedException {
+        StarService starService = new StarService();
+        List<Star> stars = starService.getStarsWithoutPhotos();
+
+        if (stars.isEmpty()) {
+            LOGGER.info("All actors already have photos");
+            return;
+        }
+
+        LOGGER.info("Fetching photos for " + stars.size() + " actors");
+        int updated = 0, errors = 0;
+
+        for (Star star : stars) {
+            try {
+                String photoUrl = MoviePosterUtil.searchPersonPhoto(star.getName());
+                if (photoUrl != null) {
+                    starService.updateStarPhotoUrl(star.getId(), photoUrl);
+                    updated++;
+                } else {
+                    starService.updateStarPhotoUrl(star.getId(), "photo_not_found");
+                }
+            } catch (Exception e) {
+                errors++;
+                LOGGER.log(Level.WARNING, "Error updating photo for: " + star.getName(), e);
+            }
+            Thread.sleep(DELAY_BETWEEN_REQUESTS_MS);
+        }
+
+        LOGGER.info("Actor photos: " + updated + " updated, " + errors + " errors");
+    }
+
+    // ------------------------------------------------------------------
+    // Step 3: ingest new movies from TMDB discover
+    // ------------------------------------------------------------------
+
+    private void ingestNewMovies() {
+        TmdbIngestService ingestService = new TmdbIngestService();
+        TmdbIngestService.IngestStats stats = ingestService.ingestDiscoverMovies(DISCOVER_PAGES);
+        LOGGER.info("TMDB discover ingestion: " + stats);
     }
 }

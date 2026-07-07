@@ -41,6 +41,22 @@ public class StarService {
         return starDAO.update(star);
     }
 
+    public boolean updateStarPhotoUrl(String starId, String photoUrl) {
+        return starDAO.updatePhotoUrl(starId, photoUrl);
+    }
+
+    public List<Star> getStarsWithoutPhotos() {
+        return starDAO.getStarsWithoutPhotos();
+    }
+
+    public Star findByExactName(String name) {
+        return starDAO.findByExactName(name);
+    }
+
+    public String generateNextStarId() {
+        return starDAO.generateNextStarId();
+    }
+
     public boolean deleteStar(String id) {
         return starDAO.delete(id);
     }

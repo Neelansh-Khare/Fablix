@@ -168,53 +168,23 @@ public class PosterUpdateServlet extends HttpServlet {
 
     private boolean updateMoviePoster(Movie movie) {
         try {
-            LOGGER.info("Searching for poster: " + movie.getTitle() + " (" + movie.getYear() + ")");
-
-            // Search for poster using TMDB API
-            MoviePosterUtil.MoviePosterResult posterResult =
+            MoviePosterUtil.MoviePosterResult result =
                     MoviePosterUtil.searchMoviePoster(movie.getTitle(), movie.getYear());
 
-            if (posterResult != null) {
-                boolean movieUpdated = false;
-
-                // Update poster URL if found
-                if (posterResult.getPosterUrl() != null) {
-                    String oldBannerUrl = movie.getBannerUrl();
-                    movie.setBannerUrl(posterResult.getPosterUrl());
-                    movieUpdated = true;
-                    LOGGER.info("Found poster URL for " + movie.getTitle() + ": " + posterResult.getPosterUrl());
-                } else {
-                    LOGGER.info("No poster URL found for: " + movie.getTitle());
-                }
-
-                // Update trailer URL if available
-                if (posterResult.getTrailerUrl() != null &&
-                        (movie.getTrailerUrl() == null || movie.getTrailerUrl().isEmpty())) {
-                    movie.setTrailerUrl(posterResult.getTrailerUrl());
-                    movieUpdated = true;
-                    LOGGER.info("Added trailer URL for " + movie.getTitle());
-                }
-
-                // Save updated movie if any changes were made
-                if (movieUpdated) {
-                    boolean success = movieService.updateMovie(movie);
-                    if (success) {
-                        LOGGER.info("Successfully updated movie in database: " + movie.getTitle());
-                        return true;
-                    } else {
-                        LOGGER.warning("Failed to save updated movie to database: " + movie.getTitle());
-                    }
-                } else {
-                    LOGGER.info("No updates needed for movie: " + movie.getTitle());
-                    return false;
-                }
-            } else {
-                LOGGER.info("No TMDB results found for: " + movie.getTitle() + " (" + movie.getYear() + ")");
+            if (result != null && result.getPosterUrl() != null) {
+                boolean success = movieService.updateMoviePosterFields(
+                    movie.getId(),
+                    result.getPosterUrl(),
+                    result.getTrailerUrl(),
+                    result.getRating(),
+                    result.getNumVotes()
+                );
+                if (success) LOGGER.info("Updated poster for: " + movie.getTitle());
+                return success;
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error updating poster for " + movie.getTitle(), e);
         }
-
         return false;
     }
 

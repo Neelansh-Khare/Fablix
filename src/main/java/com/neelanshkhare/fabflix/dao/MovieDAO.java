@@ -14,6 +14,7 @@ public interface MovieDAO {
     List<Movie> searchMovies(String query, String title, Integer year, String director, String starName, Integer genreId, String firstLetter, String sortBy, String sortOrder, int page, int pageSize);
     List<Movie> listMovies(int page, int pageSize);
     List<Movie> getMoviesWithoutPosters(int limit);
+    List<Movie> getAllMoviesWithoutPosters();
     List<Movie> getSimilarMovies(String movieId, int limit);
     List<Movie> getCoPurchaseRecommendations(String movieId, int limit);
     int countMovies();
@@ -21,5 +22,8 @@ public interface MovieDAO {
     boolean insert(Movie movie);
     String addMovieWithProcedure(String title, int year, String director, String starName, String genreName);
     boolean update(Movie movie);
+    boolean updatePosterFields(String movieId, String bannerUrl, String trailerUrl, double rating, int numVotes);
     boolean delete(String id);
+    boolean existsByTitleAndYear(String title, int year);
+    String generateNextMovieId();
 }

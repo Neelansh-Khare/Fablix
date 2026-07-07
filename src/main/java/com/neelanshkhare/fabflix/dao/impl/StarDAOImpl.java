@@ -67,16 +67,11 @@ public class StarDAOImpl implements StarDAO {
 
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+
             stmt.setString(1, "%" + name + "%");
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Star star = new Star();
-                    star.setId(rs.getString("id"));
-                    star.setName(rs.getString("name"));
-                    star.setBirthYear(rs.getObject("birth_year") != null ? rs.getInt("birth_year") : null);
-                    star.setPhotoUrl(rs.getString("photo_url"));
-                    stars.add(star);
+                    stars.add(mapStar(rs));
                 }
             }
         } catch (SQLException e) {
@@ -84,6 +79,74 @@ public class StarDAOImpl implements StarDAO {
         }
 
         return stars;
+    }
+
+    @Override
+    public Star findByExactName(String name) {
+        String sql = "SELECT id, name, birth_year, photo_url FROM stars WHERE name = ? LIMIT 1";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, name);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return mapStar(rs);
+            }
+        } catch (SQLException e) {
+            logger.error("Error finding star by exact name: {}", name, e);
+        }
+        return null;
+    }
+
+    @Override
+    public List<Star> getStarsWithoutPhotos() {
+        String sql = "SELECT id, name, birth_year, photo_url FROM stars WHERE photo_url IS NULL OR photo_url = ''";
+        List<Star> stars = new ArrayList<>();
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    stars.add(mapStar(rs));
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting stars without photos", e);
+        }
+        return stars;
+    }
+
+    @Override
+    public boolean updatePhotoUrl(String starId, String photoUrl) {
+        String sql = "UPDATE stars SET photo_url = ? WHERE id = ?";
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, photoUrl);
+            stmt.setString(2, starId);
+            return stmt.executeUpdate() == 1;
+        } catch (SQLException e) {
+            logger.error("Error updating photo URL for star: {}", starId, e);
+        }
+        return false;
+    }
+
+    @Override
+    public String generateNextStarId() {
+        String sql = "SELECT 'nm' || LPAD((COALESCE(MAX(CAST(SUBSTRING(id, 3) AS INTEGER)), 0) + 1)::text, 7, '0') FROM stars WHERE id ~ '^nm[0-9]+$'";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) return rs.getString(1);
+        } catch (SQLException e) {
+            logger.error("Error generating next star ID", e);
+        }
+        return "nm0000001";
+    }
+
+    private Star mapStar(ResultSet rs) throws SQLException {
+        Star star = new Star();
+        star.setId(rs.getString("id"));
+        star.setName(rs.getString("name"));
+        star.setBirthYear(rs.getObject("birth_year") != null ? rs.getInt("birth_year") : null);
+        star.setPhotoUrl(rs.getString("photo_url"));
+        return star;
     }
 
     @Override
@@ -96,16 +159,11 @@ public class StarDAOImpl implements StarDAO {
 
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+
             stmt.setString(1, movieId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Star star = new Star();
-                    star.setId(rs.getString("id"));
-                    star.setName(rs.getString("name"));
-                    star.setBirthYear(rs.getObject("birth_year") != null ? rs.getInt("birth_year") : null);
-                    star.setPhotoUrl(rs.getString("photo_url"));
-                    stars.add(star);
+                    stars.add(mapStar(rs));
                 }
             }
         } catch (SQLException e) {
@@ -123,17 +181,12 @@ public class StarDAOImpl implements StarDAO {
 
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+
             stmt.setInt(1, pageSize);
             stmt.setInt(2, offset);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Star star = new Star();
-                    star.setId(rs.getString("id"));
-                    star.setName(rs.getString("name"));
-                    star.setBirthYear(rs.getObject("birth_year") != null ? rs.getInt("birth_year") : null);
-                    star.setPhotoUrl(rs.getString("photo_url"));
-                    stars.add(star);
+                    stars.add(mapStar(rs));
                 }
             }
         } catch (SQLException e) {

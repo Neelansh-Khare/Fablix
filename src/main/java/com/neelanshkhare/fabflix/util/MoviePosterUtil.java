@@ -11,6 +11,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MoviePosterUtil {
     private static final Logger LOGGER = LoggerFactory.getLogger(MoviePosterUtil.class);
@@ -21,6 +23,10 @@ public class MoviePosterUtil {
     private static final String TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
     private static final String TMDB_SEARCH_URL = TMDB_BASE_URL + "/search/movie";
     private static final String TMDB_VIDEO_URL = TMDB_BASE_URL + "/movie/%d/videos";
+    private static final String TMDB_DISCOVER_URL = TMDB_BASE_URL + "/discover/movie";
+    private static final String TMDB_MOVIE_DETAIL_URL = TMDB_BASE_URL + "/movie/%d";
+    private static final String TMDB_PERSON_SEARCH_URL = TMDB_BASE_URL + "/search/person";
+    static final int DISCOVER_TOP_CAST = 5;
 
     // Rate limiting
     private static long lastRequestTime = 0;
@@ -398,6 +404,225 @@ public class MoviePosterUtil {
             return "https://image.tmdb.org/t/p/w300" + posterPath;
         }
         return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // TMDB Discover + full movie details
+    // -------------------------------------------------------------------------
+
+    public static class TmdbCastMember {
+        private String name;
+        private String photoUrl;
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getPhotoUrl() { return photoUrl; }
+        public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+    }
+
+    public static class TmdbMovieDetails {
+        private int tmdbId;
+        private String title;
+        private int year;
+        private String director;
+        private String posterUrl;
+        private String trailerUrl;
+        private double rating;
+        private int numVotes;
+        private List<String> genreNames = new ArrayList<>();
+        private List<TmdbCastMember> castMembers = new ArrayList<>();
+
+        public int getTmdbId() { return tmdbId; }
+        public void setTmdbId(int tmdbId) { this.tmdbId = tmdbId; }
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public int getYear() { return year; }
+        public void setYear(int year) { this.year = year; }
+        public String getDirector() { return director; }
+        public void setDirector(String director) { this.director = director; }
+        public String getPosterUrl() { return posterUrl; }
+        public void setPosterUrl(String posterUrl) { this.posterUrl = posterUrl; }
+        public String getTrailerUrl() { return trailerUrl; }
+        public void setTrailerUrl(String trailerUrl) { this.trailerUrl = trailerUrl; }
+        public double getRating() { return rating; }
+        public void setRating(double rating) { this.rating = rating; }
+        public int getNumVotes() { return numVotes; }
+        public void setNumVotes(int numVotes) { this.numVotes = numVotes; }
+        public List<String> getGenreNames() { return genreNames; }
+        public List<TmdbCastMember> getCastMembers() { return castMembers; }
+    }
+
+    /**
+     * Fetch a page of movies from TMDB discover (popularity desc, recent releases).
+     * Returns partial details — only tmdbId, title, year set.
+     */
+    public static List<TmdbMovieDetails> fetchDiscoverMovies(int page) {
+        List<TmdbMovieDetails> results = new ArrayList<>();
+        if (!isApiKeyConfigured()) return results;
+
+        try {
+            enforceRateLimit();
+            String url = TMDB_DISCOVER_URL
+                + "?api_key=" + TMDB_API_KEY
+                + "&sort_by=popularity.desc"
+                + "&page=" + page
+                + "&include_adult=false";
+
+            HttpURLConnection conn = createConnection(url);
+            try {
+                if (conn.getResponseCode() == 200) {
+                    JSONObject body = new JSONObject(readResponse(conn));
+                    JSONArray movies = body.getJSONArray("results");
+                    for (int i = 0; i < movies.length(); i++) {
+                        JSONObject m = movies.getJSONObject(i);
+                        TmdbMovieDetails d = new TmdbMovieDetails();
+                        d.setTmdbId(m.getInt("id"));
+                        d.setTitle(m.optString("title", ""));
+                        d.setYear(parseYear(m.optString("release_date", "")));
+                        results.add(d);
+                    }
+                }
+            } finally {
+                conn.disconnect();
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Error fetching TMDB discover page {}", page, e);
+        }
+        return results;
+    }
+
+    /**
+     * Fetch full movie details including credits and trailer in one TMDB call.
+     */
+    public static TmdbMovieDetails fetchMovieDetails(int tmdbId) {
+        if (!isApiKeyConfigured()) return null;
+
+        try {
+            enforceRateLimit();
+            String url = String.format(TMDB_MOVIE_DETAIL_URL, tmdbId)
+                + "?api_key=" + TMDB_API_KEY
+                + "&append_to_response=credits,videos";
+
+            HttpURLConnection conn = createConnection(url);
+            try {
+                if (conn.getResponseCode() != 200) return null;
+                JSONObject body = new JSONObject(readResponse(conn));
+
+                TmdbMovieDetails d = new TmdbMovieDetails();
+                d.setTmdbId(tmdbId);
+                d.setTitle(body.optString("title", ""));
+                d.setYear(parseYear(body.optString("release_date", "")));
+                d.setRating(body.optDouble("vote_average", 0.0));
+                d.setNumVotes(body.optInt("vote_count", 0));
+
+                if (body.has("poster_path") && !body.isNull("poster_path")) {
+                    d.setPosterUrl(TMDB_IMAGE_BASE_URL + body.getString("poster_path"));
+                }
+
+                // Genres
+                if (body.has("genres")) {
+                    JSONArray genres = body.getJSONArray("genres");
+                    for (int i = 0; i < genres.length(); i++) {
+                        d.getGenreNames().add(genres.getJSONObject(i).getString("name"));
+                    }
+                }
+
+                // Credits → director + top cast
+                if (body.has("credits")) {
+                    JSONObject credits = body.getJSONObject("credits");
+
+                    if (credits.has("crew")) {
+                        JSONArray crew = credits.getJSONArray("crew");
+                        for (int i = 0; i < crew.length(); i++) {
+                            JSONObject member = crew.getJSONObject(i);
+                            if ("Director".equals(member.optString("job"))) {
+                                d.setDirector(member.getString("name"));
+                                break;
+                            }
+                        }
+                    }
+
+                    if (credits.has("cast")) {
+                        JSONArray cast = credits.getJSONArray("cast");
+                        for (int i = 0; i < Math.min(DISCOVER_TOP_CAST, cast.length()); i++) {
+                            JSONObject member = cast.getJSONObject(i);
+                            TmdbCastMember cm = new TmdbCastMember();
+                            cm.setName(member.optString("name", ""));
+                            String profilePath = member.optString("profile_path", "");
+                            if (!profilePath.isEmpty() && !"null".equals(profilePath)) {
+                                cm.setPhotoUrl(TMDB_IMAGE_BASE_URL + profilePath);
+                            }
+                            d.getCastMembers().add(cm);
+                        }
+                    }
+                }
+
+                // Trailer from videos
+                if (body.has("videos")) {
+                    JSONArray videos = body.getJSONObject("videos").getJSONArray("results");
+                    for (int i = 0; i < videos.length(); i++) {
+                        JSONObject v = videos.getJSONObject(i);
+                        if ("YouTube".equalsIgnoreCase(v.optString("site"))
+                                && "Trailer".equalsIgnoreCase(v.optString("type"))) {
+                            d.setTrailerUrl("https://www.youtube.com/embed/" + v.getString("key"));
+                            break;
+                        }
+                    }
+                }
+
+                return d;
+            } finally {
+                conn.disconnect();
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Error fetching TMDB movie details for id {}", tmdbId, e);
+        }
+        return null;
+    }
+
+    /**
+     * Search TMDB for an actor's profile photo. Results are Redis-cached.
+     */
+    public static String searchPersonPhoto(String actorName) {
+        if (!isApiKeyConfigured() || actorName == null || actorName.isBlank()) return null;
+
+        String cacheKey = "actor_photo:" + actorName;
+        String cached = RedisUtil.get(cacheKey);
+        if (cached != null && !cached.isEmpty()) return cached;
+
+        try {
+            enforceRateLimit();
+            String url = TMDB_PERSON_SEARCH_URL
+                + "?api_key=" + TMDB_API_KEY
+                + "&query=" + URLEncoder.encode(actorName, java.nio.charset.StandardCharsets.UTF_8);
+
+            HttpURLConnection conn = createConnection(url);
+            try {
+                if (conn.getResponseCode() == 200) {
+                    JSONObject body = new JSONObject(readResponse(conn));
+                    JSONArray results = body.getJSONArray("results");
+                    if (!results.isEmpty()) {
+                        String profilePath = results.getJSONObject(0).optString("profile_path", "");
+                        if (!profilePath.isEmpty() && !"null".equals(profilePath)) {
+                            String photoUrl = TMDB_IMAGE_BASE_URL + profilePath;
+                            RedisUtil.set(cacheKey, photoUrl, RedisUtil.POSTER_TTL);
+                            return photoUrl;
+                        }
+                    }
+                }
+            } finally {
+                conn.disconnect();
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Error searching TMDB person photo for: {}", actorName, e);
+        }
+        return null;
+    }
+
+    private static int parseYear(String releaseDate) {
+        if (releaseDate != null && releaseDate.length() >= 4) {
+            try { return Integer.parseInt(releaseDate.substring(0, 4)); } catch (NumberFormatException ignored) {}
+        }
+        return 0;
     }
 
     // Method to check if API key is configured

@@ -160,35 +160,138 @@ public class MovieDAOImpl implements MovieDAO {
         return movies;
     }
 
+    private static final String MOVIES_WITHOUT_POSTERS_SQL =
+        "SELECT id, title, year, director, banner_url, trailer_url FROM movies " +
+        "WHERE banner_url IS NULL OR banner_url = '' " +
+        "OR banner_url LIKE '%no-poster.jpg%' OR banner_url LIKE '%placeholder%'";
+
     @Override
     public List<Movie> getMoviesWithoutPosters(int limit) {
-        String sql = "SELECT id, title, year, director, banner_url, trailer_url FROM movies " +
-                "WHERE banner_url IS NULL OR banner_url = '' " +
-                "OR banner_url LIKE '%no-poster.jpg%' OR banner_url LIKE '%placeholder%' " +
-                "LIMIT ?";
         List<Movie> movies = new ArrayList<>();
-
         try (Connection conn = DBConnectionUtil.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+             PreparedStatement stmt = conn.prepareStatement(MOVIES_WITHOUT_POSTERS_SQL + " LIMIT ?")) {
             stmt.setInt(1, limit);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Movie movie = new Movie();
-                    movie.setId(rs.getString("id"));
-                    movie.setTitle(rs.getString("title"));
-                    movie.setYear(rs.getInt("year"));
-                    movie.setDirector(rs.getString("director"));
-                    movie.setBannerUrl(rs.getString("banner_url"));
-                    movie.setTrailerUrl(rs.getString("trailer_url"));
-                    movies.add(movie);
+                    movies.add(mapBasicMovie(rs));
                 }
             }
         } catch (SQLException e) {
             logger.error("Error getting movies without posters", e);
         }
-
         return movies;
+    }
+
+    @Override
+    public List<Movie> getAllMoviesWithoutPosters() {
+        List<Movie> movies = new ArrayList<>();
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(MOVIES_WITHOUT_POSTERS_SQL)) {
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    movies.add(mapBasicMovie(rs));
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting all movies without posters", e);
+        }
+        return movies;
+    }
+
+    private Movie mapBasicMovie(ResultSet rs) throws SQLException {
+        Movie movie = new Movie();
+        movie.setId(rs.getString("id"));
+        movie.setTitle(rs.getString("title"));
+        movie.setYear(rs.getInt("year"));
+        movie.setDirector(rs.getString("director"));
+        movie.setBannerUrl(rs.getString("banner_url"));
+        movie.setTrailerUrl(rs.getString("trailer_url"));
+        return movie;
+    }
+
+    @Override
+    public boolean updatePosterFields(String movieId, String bannerUrl, String trailerUrl, double rating, int numVotes) {
+        String sql = "UPDATE movies SET banner_url = ?, trailer_url = ? WHERE id = ?";
+        try (Connection conn = DBConnectionUtil.getWriteConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, bannerUrl);
+                stmt.setString(2, trailerUrl);
+                stmt.setString(3, movieId);
+                int rows = stmt.executeUpdate();
+                if (rows == 1) {
+                    updateRatingsInConn(conn, movieId, rating, numVotes);
+                    conn.commit();
+                    return true;
+                }
+                conn.rollback();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            logger.error("Error updating poster fields for movie: {}", movieId, e);
+        }
+        return false;
+    }
+
+    private void updateRatingsInConn(Connection conn, String movieId, double rating, int numVotes) throws SQLException {
+        String checkSql = "SELECT 1 FROM ratings WHERE movie_id = ?";
+        boolean exists;
+        try (PreparedStatement check = conn.prepareStatement(checkSql)) {
+            check.setString(1, movieId);
+            try (ResultSet rs = check.executeQuery()) {
+                exists = rs.next();
+            }
+        }
+        if (exists) {
+            String updateSql = "UPDATE ratings SET rating = ?, num_votes = ? WHERE movie_id = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(updateSql)) {
+                stmt.setDouble(1, rating);
+                stmt.setInt(2, numVotes);
+                stmt.setString(3, movieId);
+                stmt.executeUpdate();
+            }
+        } else {
+            String insertSql = "INSERT INTO ratings (movie_id, rating, num_votes) VALUES (?, ?, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                stmt.setString(1, movieId);
+                stmt.setDouble(2, rating);
+                stmt.setInt(3, numVotes);
+                stmt.executeUpdate();
+            }
+        }
+    }
+
+    @Override
+    public boolean existsByTitleAndYear(String title, int year) {
+        String sql = "SELECT 1 FROM movies WHERE title = ? AND year = ? LIMIT 1";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, title);
+            stmt.setInt(2, year);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            logger.error("Error checking movie existence: {} ({})", title, year, e);
+        }
+        return false;
+    }
+
+    @Override
+    public String generateNextMovieId() {
+        String sql = "SELECT 'tt' || LPAD((COALESCE(MAX(CAST(SUBSTRING(id, 3) AS INTEGER)), 0) + 1)::text, 7, '0') FROM movies WHERE id ~ '^tt[0-9]+$'";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) return rs.getString(1);
+        } catch (SQLException e) {
+            logger.error("Error generating next movie ID", e);
+        }
+        return "tt0000001";
     }
 
     @Override
