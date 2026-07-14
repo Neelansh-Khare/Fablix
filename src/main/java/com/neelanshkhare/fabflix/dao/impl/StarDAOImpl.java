@@ -130,7 +130,7 @@ public class StarDAOImpl implements StarDAO {
     @Override
     public String generateNextStarId() {
         String sql = "SELECT 'nm' || LPAD((COALESCE(MAX(CAST(SUBSTRING(id, 3) AS INTEGER)), 0) + 1)::text, 7, '0') FROM stars WHERE id ~ '^nm[0-9]+$'";
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             if (rs.next()) return rs.getString(1);

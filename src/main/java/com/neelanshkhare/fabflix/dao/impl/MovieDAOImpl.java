@@ -284,7 +284,7 @@ public class MovieDAOImpl implements MovieDAO {
     @Override
     public String generateNextMovieId() {
         String sql = "SELECT 'tt' || LPAD((COALESCE(MAX(CAST(SUBSTRING(id, 3) AS INTEGER)), 0) + 1)::text, 7, '0') FROM movies WHERE id ~ '^tt[0-9]+$'";
-        try (Connection conn = DBConnectionUtil.getConnection();
+        try (Connection conn = DBConnectionUtil.getWriteConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             if (rs.next()) return rs.getString(1);
