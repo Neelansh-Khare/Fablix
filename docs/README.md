@@ -21,6 +21,7 @@ This directory contains all project documentation for the FabFlix application.
 | [`nextSteps.md`](nextSteps.md) | Project roadmap and future improvements |
 | [`nextStepsV2.md`](nextStepsV2.md) | Updated project roadmap |
 | [`ANALYSIS-11-12-2025.md`](ANALYSIS-11-12-2025.md) | Project analysis and audit report |
+| [`SPRING_BOOT_VS_CURRENT_SETUP.md`](SPRING_BOOT_VS_CURRENT_SETUP.md) | Compares the current Maven + plain Servlet setup against a Spring Boot rewrite |
 
 ## Quick Start
 
