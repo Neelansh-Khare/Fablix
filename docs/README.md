@@ -13,6 +13,7 @@ This directory contains all project documentation for the FabFlix application.
 | [`setup.md`](setup.md) | General setup documentation | All |
 | [`database.md`](database.md) | Database schema and architecture documentation | All |
 | [`REDIS_SETUP.md`](REDIS_SETUP.md) | Redis cache setup and configuration | All |
+| [`EC2_DEPLOYMENT.md`](EC2_DEPLOYMENT.md) | Deploying the Docker Compose stack to AWS EC2 | Production |
 
 ### Project Planning & Analysis
 
