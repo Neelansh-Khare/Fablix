@@ -1,0 +1,87 @@
+version: '3.8'
+
+# Stripped-down stack for a free-tier EC2 instance (t3.micro/t2.micro, 1 GB RAM):
+# single Postgres node (no replica), single Redis node (cluster mode with 0
+# replicas, so JedisCluster still works unmodified), single Tomcat node, no
+# separate Apache LB. See docs/EC2_DEPLOYMENT.md "Free tier deployment" for
+# the tradeoffs this drops (no HA, no read scaling).
+
+services:
+  db-primary:
+    image: postgres:15-alpine
+    container_name: fabflix-db-primary
+    environment:
+      POSTGRES_DB: fabflix
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    command: |
+      postgres
+      -c shared_buffers=32MB
+      -c max_connections=20
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-primary-data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    mem_limit: 160m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-node-1:
+    image: redis:7-alpine
+    container_name: redis-node-1
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./conf/redis-cluster.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    mem_limit: 80m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # redis-cli --cluster create refuses fewer than 3 master nodes, so a
+  # single-node cluster has to be formed by hand: assign it all 16384 hash
+  # slots directly. Client-side this still looks like an ordinary (one-shard,
+  # no-replica) Redis Cluster, so RedisUtil's JedisCluster needs no changes.
+  redis-cluster-init:
+    image: redis:7-alpine
+    container_name: redis-cluster-init
+    depends_on:
+      redis-node-1:
+        condition: service_healthy
+    command: >
+      sh -c "redis-cli -h redis-node-1 -p 6379 cluster addslotsrange 0 16383"
+
+  app1:
+    build: .
+    container_name: fabflix-app1
+    environment:
+      REDIS_CLUSTER_NODES: redis-node-1:6379
+      DB_DRIVER: org.postgresql.Driver
+      DB_URL_WRITE: jdbc:postgresql://db-primary:5432/fabflix
+      DB_URL_READ: jdbc:postgresql://db-primary:5432/fabflix
+      DB_USERNAME: postgres
+      DB_PASSWORD: password
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      RECAPTCHA_SECRET: ${RECAPTCHA_SECRET}
+      CATALINA_OPTS: -Xms128m -Xmx320m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC
+    ports:
+      - "80:8080"
+      - "443:8443"
+    depends_on:
+      db-primary:
+        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    mem_limit: 400m
+
+volumes:
+  postgres-primary-data:
+    driver: local
