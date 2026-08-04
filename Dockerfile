@@ -46,5 +46,8 @@ ENV DB_DRIVER=org.postgresql.Driver
 ENV DB_URL=jdbc:postgresql://localhost:5432/fabflix
 ENV DB_USERNAME=postgres
 ENV DB_PASSWORD=password
+ENV TMDB_API_KEY=
+ENV RECAPTCHA_SECRET_KEY=
+ENV RECAPTCHA_SITE_KEY=
 
 CMD ["catalina.sh", "run"]

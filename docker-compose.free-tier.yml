@@ -69,7 +69,8 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: password
       TMDB_API_KEY: ${TMDB_API_KEY}
-      RECAPTCHA_SECRET: ${RECAPTCHA_SECRET}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY}
+      RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY}
       CATALINA_OPTS: -Xms128m -Xmx320m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC
     ports:
       - "80:8080"
